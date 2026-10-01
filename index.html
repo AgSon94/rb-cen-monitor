@@ -172,7 +172,7 @@ footer a { color: inherit; }
     <section class="panel box">
       <h2 id="epiTitle">Alerty w dobie</h2>
       <div class="scroll"><table class="t" id="epi"></table></div>
-      <p class="note">Poziom każdego kwadransa liczony z tego, co PSE opublikowało przed jego startem – tak, jak widziałby go alert. „Wynik PV 1 MW” = suma ujemnych CEN × 0,25 h, czyli ile zapłaciłaby farma 1 MW produkująca w tych kwadransach pełną mocą.</p>
+      <p class="note">Poziom każdego kwadransa liczony z tego, co PSE opublikowało przed jego startem – tak, jak widziałby go alert. „Wynik PV 1 MW” = ile zapłaciłaby farma fotowoltaiczna o mocy 1 MW za energię wyprodukowaną w kwadransach z ujemną CEN. Produkcja w każdym kwadransie według krajowej prognozy PV z planu PSE (BPKD), przeskalowanej tak, by najlepszy kwadrans miesiąca dawał pełne 1 MW. Kwadranse z dodatnią CEN pominięte.</p>
     </section>
     <section class="panel box">
       <h2>Reguła alertu</h2>
@@ -213,8 +213,22 @@ async function get(ep, d) {
   return (await r.json()).value;
 }
 
+const pvMaxCache = {};
+async function pvMonthMax(d) {
+  const mon = d.slice(0, 7);
+  if (pvMaxCache[mon] == null) {
+    const [y, mo] = mon.split("-").map(Number), last = new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10);
+    const u = API + "pdgobpkd?$filter=" + encodeURIComponent(`business_date ge '${mon}-01' and business_date le '${last}'`) + "&$select=gen_fv&$first=5000";
+    const r = await fetch(u);
+    if (!r.ok) throw new Error("pdgobpkd " + r.status);
+    pvMaxCache[mon] = Math.max(0, ...(await r.json()).value.map(x => x.gen_fv || 0));
+  }
+  return pvMaxCache[mon];
+}
+
 async function loadDay(d) {
-  const [fc, cost, sdac] = await Promise.all([get("price-fcst", d), get("price-cost", d), get("csdac-pln", d)]);
+  const [fc, cost, sdac, pv, pvMax] = await Promise.all([get("price-fcst", d), get("price-cost", d), get("csdac-pln", d),
+    get("pdgobpkd", d).catch(() => []), pvMonthMax(d).catch(() => 0)]);
   const m = new Map();
   const slot = r => {
     const k = r.dtime_utc.slice(0, 16);
@@ -224,6 +238,8 @@ async function loadDay(d) {
   sdac.forEach(r => slot(r).sdac = r.csdac_pln);
   fc.forEach(r => Object.assign(slot(r), { cen_f: r.cen_fcst, kier_f: r.contracting, pub: utc(r.publication_ts_utc) }));
   cost.forEach(r => { if (r.cen_cost != null) Object.assign(slot(r), { cen: r.cen_cost, kier: r.contracting }); });
+  // energia z 1 MW PV w kwadransie: 0,25 h × (krajowa prognoza PV z planu BPKD / jej maksimum w miesiącu)
+  pv.forEach(r => { if (pvMax > 0 && m.has(r.dtime_utc.slice(0, 16))) slot(r).mwh = .25 * (r.gen_fv || 0) / pvMax; });
   const O = [...m.values()].sort((a, b) => a.start - b.start);
   O.forEach(o => { o.minuta = +plTime(o.start).slice(3, 5); });
   return O;
@@ -388,6 +404,13 @@ function renderChart(O, now, isToday) {
 function niceStep(x) { const p = Math.pow(10, Math.floor(Math.log10(x || 1))); const n = x / p; return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * p; }
 
 /* ---------- epizody ---------- */
+const czas = n => { const h = Math.floor(n / 4), mi = (n % 4) * 15; return (h ? h + " h" : "") + (h && mi ? " " : "") + (mi ? mi + " min" : ""); };
+/* Wynik farmy PV 1 MW w kwadransach z ujemną CEN: Σ CEN × energia z profilu PV. null, gdy brak profilu PV. */
+function wynikPV(list) {
+  if (!list.some(o => o.mwh != null)) return null;
+  return list.reduce((s, o) => { const v = o.cen ?? o.cen_f; return v != null && v < 0 && o.mwh ? s + v * o.mwh : s; }, 0);
+}
+
 function renderEpisodes(O, d) {
   $("epiTitle").textContent = "Alerty w dobie " + d.split("-").reverse().join(".");
   const eps = []; let cur = null;
@@ -405,17 +428,18 @@ function renderEpisodes(O, d) {
   const rows = eps.map(e => {
     const vals = e.list.map(o => o.cen ?? o.cen_f).filter(v => v != null);
     const neg = vals.filter(v => v < 0);
+    const wynik = wynikPV(e.list);
     const settled = e.list.every(o => o.cen != null);
     return `<tr><td class="num">${e.a.okres.slice(0, 5)}–${e.b.okres.slice(-5)}</td>
       <td><span class="pill p${e.max}">${NAZWA[e.max]}</span></td>
-      <td class="r num">${e.list.length}</td>
+      <td class="r num">${czas(e.list.length)}</td>
       <td class="r num">${neg.length}</td>
       <td class="r num">${vals.length ? z0(Math.min(...vals)) : "–"}</td>
-      <td class="r num">${z0(neg.reduce((s, v) => s + v * .25, 0))}${settled ? "" : "*"}</td></tr>`;
+      <td class="r num">${wynik == null ? "–" : z0(wynik)}${settled ? "" : "*"}</td></tr>`;
   }).join("");
   const missed = O.filter(o => !o.future && o.lv < 2 && (o.cen ?? o.cen_f) < 0);
-  t.innerHTML = `<thead><tr><th>Od–do</th><th>Maks.</th><th class="r">Kwadr.</th><th class="r">Ujemne</th><th class="r">Min. CEN</th><th class="r">Wynik PV 1 MW w zł</th></tr></thead><tbody>${rows}</tbody>
-    <tfoot><tr><td colspan="6" class="muted small">Poza alertem ujemnych kwadransów: ${missed.length}${missed.length ? ` (wynik PV 1 MW ${z0(missed.reduce((s, o) => s + (o.cen ?? o.cen_f) * .25, 0))} zł)` : ""}. * – jeszcze bez rozliczenia, liczone z prognozy.</td></tr></tfoot>`;
+  t.innerHTML = `<thead><tr><th>Od–do</th><th>Maks.</th><th class="r">Czas trwania</th><th class="r">Ujemne</th><th class="r">Min. CEN</th><th class="r">Wynik PV 1 MW w zł</th></tr></thead><tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="6" class="muted small">Poza alertem ujemnych kwadransów: ${missed.length}${missed.length ? ` (wynik PV 1 MW ${wynikPV(missed) == null ? "–" : z0(wynikPV(missed))} zł)` : ""}. * – jeszcze bez rozliczenia, liczone z prognozy.</td></tr></tfoot>`;
 }
 
 /* ---------- sterowanie ---------- */
