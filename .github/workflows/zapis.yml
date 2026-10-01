@@ -1,0 +1,40 @@
+name: Zapis PSE
+
+# Co 5 min zapisuje kolejne wersje raportów PSE (ograniczenia OZE, prognoza CEN) na gałąź dane-zapis.
+on:
+  schedule:
+    - cron: "*/5 3-19 * * *"   # ok. 5:00–21:55 czasu polskiego latem, 4:00–20:55 zimą
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: zapis-pse
+  cancel-in-progress: false
+
+jobs:
+  zapis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: dane-zapis
+          path: galaz-zapis
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Zapisz nowe wersje raportów PSE
+        run: python zapisz.py --cel galaz-zapis/zapis
+      - name: Wypchnij zmiany
+        working-directory: galaz-zapis
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "zapis-pse"
+            git config user.email "zapis-pse@users.noreply.github.com"
+            git add -A
+            git commit -q -m "zapis $(date -u '+%Y-%m-%d %H:%M') UTC"
+            git push -q
+          fi
