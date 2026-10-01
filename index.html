@@ -202,9 +202,9 @@ footer a { color: inherit; }
 
 <script>
 const API = "https://api.raporty.pse.pl/api/";
-let REG = { prog_czerwony_zl_mwh: -500, prog_zolty_sdac_zl_mwh: 200, mail_od_poziomu: 2, wlacz_po_kwadransach: 2 };
+let REG = { prog_czerwony_zl_mwh: -500, prog_zolty_sdac_zl_mwh: 200, mail_od_poziomu: 2, koniec_alertu_po_kwadransach: 2 };
 const OFF = () => REG.mail_od_poziomu;      // od tego poziomu trwa alert (wysokie ryzyko)
-const K = () => REG.wlacz_po_kwadransach;   // tyle kolejnych zwykłych kwadransów bez ujemnej CEN kończy alert
+const K = () => REG.koniec_alertu_po_kwadransach;   // tyle kolejnych zwykłych kwadransów bez ujemnej CEN kończy alert
 const NAZWA = ["brak sygnału", "czujność", "wysokie ryzyko", "głęboko ujemna"];
 const $ = id => document.getElementById(id);
 const nf0 = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 0 });
