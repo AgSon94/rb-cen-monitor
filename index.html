@@ -172,7 +172,7 @@ footer a { color: inherit; }
     <section class="panel box">
       <h2 id="epiTitle">Alerty w dobie</h2>
       <div class="scroll"><table class="t" id="epi"></table></div>
-      <p class="note">Poziom każdego kwadransa liczony z tego, co PSE opublikowało przed jego startem – tak, jak widziałby go alert. „Wynik 1 MW” = suma ujemnych CEN × 0,25 h przy stałej produkcji 1 MW.</p>
+      <p class="note">Poziom każdego kwadransa liczony z tego, co PSE opublikowało przed jego startem – tak, jak widziałby go alert. „Wynik PV 1 MW” = suma ujemnych CEN × 0,25 h, czyli ile zapłaciłaby farma 1 MW produkująca w tych kwadransach pełną mocą.</p>
     </section>
     <section class="panel box">
       <h2>Reguła alertu</h2>
@@ -414,8 +414,8 @@ function renderEpisodes(O, d) {
       <td class="r num">${z0(neg.reduce((s, v) => s + v * .25, 0))}${settled ? "" : "*"}</td></tr>`;
   }).join("");
   const missed = O.filter(o => !o.future && o.lv < 2 && (o.cen ?? o.cen_f) < 0);
-  t.innerHTML = `<thead><tr><th>Od–do</th><th>Maks.</th><th class="r">Kwadr.</th><th class="r">Ujemne</th><th class="r">Min. CEN</th><th class="r">Wynik 1 MW zł</th></tr></thead><tbody>${rows}</tbody>
-    <tfoot><tr><td colspan="6" class="muted small">Poza alertem ujemnych kwadransów: ${missed.length}${missed.length ? ` (wynik 1 MW ${z0(missed.reduce((s, o) => s + (o.cen ?? o.cen_f) * .25, 0))} zł)` : ""}. * – jeszcze bez rozliczenia, liczone z prognozy.</td></tr></tfoot>`;
+  t.innerHTML = `<thead><tr><th>Od–do</th><th>Maks.</th><th class="r">Kwadr.</th><th class="r">Ujemne</th><th class="r">Min. CEN</th><th class="r">Wynik PV 1 MW w zł</th></tr></thead><tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="6" class="muted small">Poza alertem ujemnych kwadransów: ${missed.length}${missed.length ? ` (wynik PV 1 MW ${z0(missed.reduce((s, o) => s + (o.cen ?? o.cen_f) * .25, 0))} zł)` : ""}. * – jeszcze bez rozliczenia, liczone z prognozy.</td></tr></tfoot>`;
 }
 
 /* ---------- sterowanie ---------- */
