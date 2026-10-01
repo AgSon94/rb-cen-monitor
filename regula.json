@@ -1,0 +1,8 @@
+{
+  "opis": "Progi reguły alertu ujemnej CEN. Zmiana tutaj działa i na stronie, i w mailach.",
+  "prog_czerwony_zl_mwh": -500,
+  "prog_zolty_sdac_zl_mwh": 200,
+  "mail_od_poziomu": 2,
+  "przypomnienie_czerwony_min": 30,
+  "godziny_pv": [7, 18]
+}

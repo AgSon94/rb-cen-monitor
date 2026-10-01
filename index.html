@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Monitor ujemnej CEN</title>
+<meta name="description" content="Prognoza i rozliczenie ceny niezbilansowania (CEN) na rynku bilansującym PSE, z alertem ryzyka ujemnych cen.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Układ: pulpit dyspozytorski – pasek stanu „teraz”, pod nim jedna szeroka oś doby (96 kwadransów), pod spodem epizody i reguła. */
+:root {
+  --bg: #f3f6f8; --panel: #ffffff; --fg: #15212c; --muted: #5d6c7a; --line: #dbe2e8; --grid: #e8edf1;
+  --accent: #1b5fd0;        /* prognoza CEN */
+  --settled: #15212c;       /* CEN rozliczeniowa */
+  --sdac: #8d99a6;          /* SDAC */
+  --long: #0e8a86; --short: #b9c3cc;
+  --l1: #d9a300; --l2: #e2700e; --l3: #cf2c2c;
+  --l1-bg: rgba(217,163,0,.13); --l2-bg: rgba(226,112,14,.16); --l3-bg: rgba(207,44,44,.17);
+  --font-ui: "Archivo", "Segoe UI", system-ui, sans-serif;
+  --font-num: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f151b; --panel: #161e26; --fg: #e4eaf0; --muted: #91a0ae; --line: #2a3541; --grid: #1f2933;
+  --accent: #6aa1ff; --settled: #e4eaf0; --sdac: #6d7a87; --long: #2fc0b8; --short: #3a4652;
+  --l1: #f0c03a; --l2: #ff8f3a; --l3: #ff5a5a;
+  --l1-bg: rgba(240,192,58,.12); --l2-bg: rgba(255,143,58,.15); --l3-bg: rgba(255,90,90,.17);
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f151b; --panel: #161e26; --fg: #e4eaf0; --muted: #91a0ae; --line: #2a3541; --grid: #1f2933;
+  --accent: #6aa1ff; --settled: #e4eaf0; --sdac: #6d7a87; --long: #2fc0b8; --short: #3a4652;
+  --l1: #f0c03a; --l2: #ff8f3a; --l3: #ff5a5a;
+  --l1-bg: rgba(240,192,58,.12); --l2-bg: rgba(255,143,58,.15); --l3-bg: rgba(255,90,90,.17);
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--font-ui); font-stretch: 100%; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 40px; display: grid; gap: 18px; }
+h1, h2 { font-stretch: 80%; text-wrap: balance; margin: 0; }
+h1 { font-size: 1.55rem; font-weight: 780; letter-spacing: -.01em; }
+h2 { font-size: 1.05rem; font-weight: 720; }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.label { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+button, input { font: inherit; color: inherit; }
+button { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 6px 11px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button[aria-pressed="true"] { background: var(--fg); color: var(--panel); border-color: var(--fg); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* nagłówek */
+.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; }
+.top p { margin: 2px 0 0; color: var(--muted); max-width: 62ch; }
+
+/* stan teraz */
+.now { display: grid; grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr)); }
+.now > div { padding: 14px 18px; display: grid; gap: 4px; align-content: start; min-width: 0; }
+.now > div + div { border-left: 1px solid var(--line); }
+.level { display: flex; align-items: center; gap: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; font-weight: 750; font-stretch: 85%; font-size: 1.25rem; }
+.dot { width: 14px; height: 14px; border-radius: 50%; background: var(--short); flex: none; }
+.now[data-l="1"] { box-shadow: inset 6px 0 0 var(--l1); } .now[data-l="1"] .dot { background: var(--l1); }
+.now[data-l="2"] { box-shadow: inset 6px 0 0 var(--l2); } .now[data-l="2"] .dot { background: var(--l2); }
+.now[data-l="3"] { box-shadow: inset 6px 0 0 var(--l3); } .now[data-l="3"] .dot { background: var(--l3); }
+.big { font-family: var(--font-num); font-size: 1.35rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.small { font-size: .85rem; }
+
+/* sterowanie dobą */
+.bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; }
+.nav, .opts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+input[type="date"] { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; }
+
+/* wykres */
+.chart { padding: 14px 10px 10px; position: relative; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 0 8px 10px; font-size: .82rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 18px; height: 0; border-top: 2px solid; display: inline-block; }
+.sq { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+.tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 5px;
+  padding: 8px 10px; font-size: .8rem; box-shadow: 0 6px 18px rgba(0,0,0,.12); min-width: 210px; z-index: 2; }
+.tip table { border-collapse: collapse; width: 100%; }
+.tip td { padding: 1px 0; } .tip td + td { text-align: right; padding-left: 12px; }
+.status { padding: 26px; text-align: center; color: var(--muted); }
+
+/* epizody i reguła */
+.cols { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.box { padding: 16px 18px; display: grid; gap: 10px; min-width: 0; }
+.scroll { overflow-x: auto; }
+table.t { border-collapse: collapse; width: 100%; font-size: .88rem; }
+.t th { text-align: left; font-weight: 600; color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em;
+  border-bottom: 1px solid var(--line); padding: 6px 8px; white-space: nowrap; }
+.t td { padding: 7px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+.t td.r, .t th.r { text-align: right; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: .78rem; font-weight: 700; color: #fff; }
+.p1 { background: var(--l1); color: #1a1400; } .p2 { background: var(--l2); } .p3 { background: var(--l3); }
+.rule { margin: 0; padding: 0; list-style: none; display: grid; gap: 9px; font-size: .9rem; }
+.rule li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; }
+.rule .sq { margin-top: 4px; }
+.note { font-size: .82rem; color: var(--muted); margin: 0; }
+footer { font-size: .8rem; color: var(--muted); }
+footer a { color: inherit; }
+
+@media (max-width: 860px) {
+  .now { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .now > div:nth-child(3) { border-left: 0; }
+  .now > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) { .now { grid-template-columns: minmax(0, 1fr); } .now > div + div { border-left: 0; border-top: 1px solid var(--line); } }
+@media (prefers-reduced-motion: no-preference) { .now { transition: box-shadow .4s; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="top">
+    <div>
+      <h1>Monitor ujemnej CEN</h1>
+      <p>Cena niezbilansowania na rynku bilansującym PSE – prognoza budowana na bieżąco, rozliczenie i poziom ryzyka ujemnych cen dla każdego kwadransa.</p>
+    </div>
+    <div class="small muted" id="upd">Ładuję dane PSE…</div>
+  </header>
+
+  <section class="panel now" id="now" data-l="0" aria-live="polite">
+    <div>
+      <span class="label">Teraz – najbliższy kwadrans</span>
+      <div class="level"><span class="chip"><span class="dot"></span><span id="nowLevel">–</span></span></div>
+      <span class="small muted" id="nowWhy">–</span>
+    </div>
+    <div><span class="label">Ostatnia prognoza PSE</span><span class="big" id="nowCen">–</span><span class="small muted" id="nowCenP">–</span></div>
+    <div><span class="label">Kierunek</span><span class="big" id="nowDir">–</span><span class="small muted" id="nowDirP">long = nadwyżka w systemie</span></div>
+    <div><span class="label">SDAC najbliższy kwadrans</span><span class="big" id="nowSdac">–</span><span class="small muted">zł/MWh, rynek dnia następnego</span></div>
+  </section>
+
+  <div class="bar">
+    <div class="nav">
+      <button id="prev" aria-label="Poprzednia doba">‹</button>
+      <input type="date" id="day" min="2024-06-14" aria-label="Doba">
+      <button id="next" aria-label="Następna doba">›</button>
+      <button id="today">Dziś</button>
+    </div>
+    <div class="opts">
+      <span class="small muted">Ważne doby:</span>
+      <button data-go="2026-08-14">14.08.2026</button>
+      <button data-go="2026-08-15">15.08.2026</button>
+      <button data-go="2025-10-29">29.10.2025</button>
+      <span class="small muted" style="margin-left:8px">Skala:</span>
+      <button id="scLog" aria-pressed="true">skompresowana</button>
+      <button id="scLin" aria-pressed="false">liniowa</button>
+    </div>
+  </div>
+
+  <section class="panel">
+    <div class="chart" id="chart"><div class="status" id="status">Ładuję dane PSE…</div></div>
+    <div class="legend">
+      <span><i class="sw" style="border-color:var(--accent)"></i>CEN prognoza PSE (ok. 12 min po kwadransie)</span>
+      <span><i class="sw" style="border-color:var(--settled);border-top-width:3px"></i>CEN rozliczeniowa (d+1)</span>
+      <span><i class="sw" style="border-color:var(--sdac);border-top-style:dashed"></i>SDAC</span>
+      <span><i class="sq" style="background:var(--long)"></i>long</span>
+      <span><i class="sq" style="background:var(--short)"></i>short</span>
+      <span><i class="sq" style="background:var(--l1)"></i>czujność</span>
+      <span><i class="sq" style="background:var(--l2)"></i>wysokie ryzyko</span>
+      <span><i class="sq" style="background:var(--l3)"></i>głęboko ujemna</span>
+    </div>
+  </section>
+
+  <div class="cols">
+    <section class="panel box">
+      <h2 id="epiTitle">Alerty w dobie</h2>
+      <div class="scroll"><table class="t" id="epi"></table></div>
+      <p class="note">Poziom każdego kwadransa liczony z tego, co PSE opublikowało przed jego startem – tak, jak widziałby go alert. „Wynik 1 MW” = suma ujemnych CEN × 0,25 h przy stałej produkcji 1 MW.</p>
+    </section>
+    <section class="panel box">
+      <h2>Reguła alertu</h2>
+      <ul class="rule">
+        <li><i class="sq" style="background:var(--l3)"></i><div><b>Głęboko ujemna</b> – ostatni znany kwadrans long i CEN &lt; <span class="num" id="r3">−500</span> zł/MWh. Historycznie: następny ujemny w ok. 81%, w co drugim poniżej −500.</div></li>
+        <li><i class="sq" style="background:var(--l2)"></i><div><b>Wysokie ryzyko</b> – ostatni znany kwadrans long i CEN &lt; 0, albo SDAC ≤ 0. Następny ujemny w ok. 72%, mediana ok. −160 zł/MWh.</div></li>
+        <li><i class="sq" style="background:var(--l1)"></i><div><b>Czujność</b> – SDAC &lt; <span class="num" id="r1">200</span> zł/MWh. Ujemna CEN w ok. 31–53% takich kwadransów (7–18).</div></li>
+        <li><i class="sq" style="background:var(--short)"></i><div><b>Koniec alertu</b> – dwa kolejne zwykłe kwadranse bez ujemnej CEN przy long. Kwadrans xx:00 może alarm podnieść, nigdy odwołać: jego prognoza bywa fałszywie „short” i dodatnia.</div></li>
+      </ul>
+      <p class="note">Statystyki z historii VI 2024 – IX 2026, godz. 7–18. Prognoza PSE ukazuje się po zakończeniu kwadransa, więc alert sygnalizuje trwający epizod, nie pierwszy ujemny kwadrans.</p>
+    </section>
+  </div>
+
+  <footer>Dane: <a href="https://raporty.pse.pl/report/bpci-energy-and-prices" target="_blank" rel="noopener">PSE, raport „Ceny i niezbilansowanie na RB”</a>, API api.raporty.pse.pl (price-fcst, price-cost, csdac-pln). Czasy lokalne. Strona odświeża się co minutę, gdy pokazuje dzisiejszą dobę.</footer>
+</main>
+
+<script>
+const API = "https://api.raporty.pse.pl/api/";
+let REG = { prog_czerwony_zl_mwh: -500, prog_zolty_sdac_zl_mwh: 200 };
+const NAZWA = ["brak sygnału", "czujność", "wysokie ryzyko", "głęboko ujemna"];
+const $ = id => document.getElementById(id);
+const nf0 = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 0 });
+const nf2 = new Intl.NumberFormat("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const z0 = v => v == null ? "–" : nf0.format(v).replace("-", "−");
+const z2 = v => v == null ? "–" : nf2.format(v).replace("-", "−");
+const fmtPL = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Warsaw", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const plTime = d => fmtPL.format(d).slice(11, 16);
+const plDate = d => fmtPL.format(d).slice(0, 10);
+const utc = s => s ? new Date(s.slice(0, 19).replace(" ", "T") + "Z") : null;
+
+let state = { day: null, O: [], scale: "log", timer: null };
+try { const s = localStorage.getItem("cen-skala"); if (s) state.scale = s; } catch (e) {}
+
+async function get(ep, d) {
+  const u = API + ep + "?$filter=" + encodeURIComponent(`business_date eq '${d}'`) + "&$first=200";
+  const r = await fetch(u);
+  if (!r.ok) throw new Error(ep + " " + r.status);
+  return (await r.json()).value;
+}
+
+async function loadDay(d) {
+  const [fc, cost, sdac] = await Promise.all([get("price-fcst", d), get("price-cost", d), get("csdac-pln", d)]);
+  const m = new Map();
+  const slot = r => {
+    const k = r.dtime_utc.slice(0, 16);
+    if (!m.has(k)) { const end = utc(r.dtime_utc); m.set(k, { k, okres: r.period, start: new Date(end - 9e5) }); }
+    return m.get(k);
+  };
+  sdac.forEach(r => slot(r).sdac = r.csdac_pln);
+  fc.forEach(r => Object.assign(slot(r), { cen_f: r.cen_fcst, kier_f: r.contracting, pub: utc(r.publication_ts_utc) }));
+  cost.forEach(r => { if (r.cen_cost != null) Object.assign(slot(r), { cen: r.cen_cost, kier: r.contracting }); });
+  const O = [...m.values()].sort((a, b) => a.start - b.start);
+  O.forEach(o => { o.minuta = +plTime(o.start).slice(3, 5); });
+  return O;
+}
+
+/* Reguła – identyczna jak w alert.py (poziom) i w analizie historii (R4). */
+function poziom(O, n, chwila) {
+  const znane = O.filter((o, i) => o.pub && o.pub <= chwila && i >= n - 8).sort((a, b) => a.pub - b.pub).slice(-6);
+  const zwykle = znane.filter(h => h.minuta !== 0).slice(-2);
+  const pelne = znane.slice(-3).filter(h => h.minuta === 0 && h.kier_f === "long" && h.cen_f < 0);
+  const ceny = [...zwykle, ...pelne].filter(h => h.kier_f === "long").map(h => h.cen_f);
+  const c = ceny.length ? Math.min(...ceny) : null;
+  const s = O[n].sdac;
+  let p = 0;
+  if (c !== null && c < REG.prog_czerwony_zl_mwh) p = 3;
+  else if (c !== null && c < 0) p = 2;
+  else if (s != null && s <= 0) p = 2;
+  else if (s != null && s < REG.prog_zolty_sdac_zl_mwh) p = 1;
+  return { p, c, znane };
+}
+
+function computeLevels(O, now) {
+  O.forEach((o, n) => { const ch = o.start < now ? o.start : now; Object.assign(o, { lv: poziom(O, n, ch).p, future: o.start > now }); });
+}
+
+/* ---------- stan teraz ---------- */
+function renderNow(O, now) {
+  const n = O.findIndex(o => o.start >= now);
+  const box = $("now");
+  if (n < 0) { box.dataset.l = 0; $("nowLevel").textContent = "–"; return; }
+  const { p, c, znane } = poziom(O, n, now);
+  box.dataset.l = p;
+  $("nowLevel").textContent = NAZWA[p];
+  $("nowWhy").textContent = `kwadrans ${O[n].okres}` + (c !== null ? ` · najniższa znana CEN przy long: ${z0(c)} zł/MWh` : "");
+  const last = znane[znane.length - 1];
+  if (last) {
+    $("nowCen").textContent = z2(last.cen_f);
+    $("nowCenP").textContent = `zł/MWh · kwadrans ${last.okres}, opubl. ${plTime(last.pub)}` + (last.minuta === 0 && last.kier_f === "short" ? " · xx:00 – mało wiarygodny" : "");
+    $("nowDir").textContent = last.kier_f;
+    $("nowDir").style.color = last.kier_f === "long" ? "var(--long)" : "var(--fg)";
+  }
+  $("nowSdac").textContent = z2(O[n].sdac);
+}
+
+/* ---------- wykres ---------- */
+const svgNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent) { const e = document.createElementNS(svgNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+
+function renderChart(O, now, isToday) {
+  const box = $("chart");
+  box.innerHTML = "";
+  if (!O.length) { box.innerHTML = '<div class="status">Brak danych PSE dla tej doby.</div>'; return; }
+  const W = Math.max(320, box.clientWidth - 20), narrow = W < 600;
+  const H = narrow ? 300 : 400, stripH = 14, levH = 8;
+  const m = { l: narrow ? 50 : 64, r: 12, t: levH + 8, b: 40 + stripH };
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const N = O.length, bw = pw / N;
+  const vals = [0];
+  O.forEach(o => { ["cen_f", "cen", "sdac"].forEach(k => { if (o[k] != null) vals.push(o[k]); }); });
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const K = 60;
+  const f = state.scale === "log" ? v => Math.asinh(v / K) : v => v;
+  const flo = f(lo), fhi = f(hi), pad = (fhi - flo) * 0.06 || 1;
+  const y0 = flo - pad, y1 = fhi + pad;
+  const Y = v => m.t + ph - (f(v) - y0) / (y1 - y0) * ph;
+  const X = i => m.l + i * bw;
+
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": "Wykres CEN dla doby" }, box);
+
+  // pasma poziomu alertu
+  O.forEach((o, i) => {
+    if (!o.lv) return;
+    el("rect", { x: X(i), y: m.t, width: bw + .5, height: ph, fill: `var(--l${o.lv}-bg)`, opacity: o.future ? .45 : 1 }, svg);
+    el("rect", { x: X(i), y: 0, width: bw + .5, height: levH, fill: `var(--l${o.lv})`, opacity: o.future ? .45 : 1 }, svg);
+  });
+
+  // siatka i oś Y
+  let ticks;
+  if (state.scale === "log") ticks = [-40000, -20000, -10000, -5000, -2000, -1000, -500, -200, -100, 0, 100, 200, 500, 1000, 2000, 5000];
+  else { const step = niceStep((hi - lo) / 6); ticks = []; for (let t = Math.ceil(lo / step) * step; t <= hi; t += step) ticks.push(t); if (!ticks.includes(0)) ticks.push(0); }
+  ticks = ticks.filter(t => f(t) >= y0 && f(t) <= y1);
+  let lastY = -1e9;
+  ticks.sort((a, b) => b - a).forEach(t => {
+    const y = Y(t);
+    el("line", { x1: m.l, x2: W - m.r, y1: y, y2: y, stroke: t === 0 ? "var(--muted)" : "var(--grid)", "stroke-width": t === 0 ? 1 : 1 }, svg);
+    if (y - lastY < 13) return; lastY = y;
+    const tx = el("text", { x: m.l - 6, y: y + 4, "text-anchor": "end", "font-size": 11, fill: "var(--muted)", "font-family": "var(--font-num)" }, svg);
+    tx.textContent = z0(t);
+  });
+  const ul = el("text", { x: 4, y: H - 6, "font-size": 10, fill: "var(--muted)" }, svg); ul.textContent = "zł/MWh";
+
+  // oś X co 2 h
+  O.forEach((o, i) => {
+    if (o.minuta !== 0) return;
+    const h = +plTime(o.start).slice(0, 2);
+    if (h % (narrow ? 4 : 2)) return;
+    el("line", { x1: X(i), x2: X(i), y1: m.t, y2: m.t + ph, stroke: "var(--grid)" }, svg);
+    const tx = el("text", { x: X(i), y: H - 6, "text-anchor": "middle", "font-size": 11, fill: "var(--muted)", "font-family": "var(--font-num)" }, svg);
+    tx.textContent = String(h).padStart(2, "0") + ":00";
+  });
+
+  // pasek kierunku
+  const sy = m.t + ph + 8;
+  O.forEach((o, i) => {
+    const k = o.kier || o.kier_f; if (!k) return;
+    el("rect", { x: X(i) + .5, y: sy, width: Math.max(1, bw - 1), height: stripH, fill: k === "long" ? "var(--long)" : "var(--short)" }, svg);
+  });
+
+  // serie
+  const path = (key, style) => {
+    let d = "", on = false;
+    O.forEach((o, i) => { const v = o[key]; if (v == null) { on = false; return; }
+      const x = X(i) + bw / 2, y = Y(v); d += (on ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1); on = true; });
+    if (d) el("path", Object.assign({ d, fill: "none" }, style), svg);
+  };
+  // SDAC jako schodki
+  let ds = ""; O.forEach((o, i) => { if (o.sdac == null) return; const y = Y(o.sdac); ds += (ds ? "L" : "M") + X(i).toFixed(1) + " " + y.toFixed(1) + "L" + (X(i) + bw).toFixed(1) + " " + y.toFixed(1); });
+  if (ds) el("path", { d: ds, fill: "none", stroke: "var(--sdac)", "stroke-width": 1.4, "stroke-dasharray": "4 3" }, svg);
+  path("cen", { stroke: "var(--settled)", "stroke-width": 2.6, "stroke-linejoin": "round", opacity: .85 });
+  path("cen_f", { stroke: "var(--accent)", "stroke-width": 1.6, "stroke-linejoin": "round" });
+  O.forEach((o, i) => {
+    if (o.cen_f == null) return;
+    const unreliable = o.minuta === 0 && o.kier_f === "short";
+    el("circle", { cx: X(i) + bw / 2, cy: Y(o.cen_f), r: narrow ? 2 : 2.6, fill: unreliable ? "var(--panel)" : "var(--accent)", stroke: "var(--accent)", "stroke-width": unreliable ? 1.4 : 0 }, svg);
+  });
+  // ostatni opublikowany punkt dziś – wyróżniony
+  if (isToday) {
+    const lastI = O.map(o => o.cen_f != null).lastIndexOf(true);
+    if (lastI >= 0) el("circle", { cx: X(lastI) + bw / 2, cy: Y(O[lastI].cen_f), r: 5.5, fill: "none", stroke: "var(--accent)", "stroke-width": 2 }, svg);
+    const nx = m.l + ((now - O[0].start) / 9e5) * bw;
+    if (nx > m.l && nx < W - m.r) {
+      el("line", { x1: nx, x2: nx, y1: m.t - 4, y2: m.t + ph, stroke: "var(--fg)", "stroke-width": 1, "stroke-dasharray": "2 3" }, svg);
+      const t = el("text", { x: nx + 4, y: m.t + 10, "font-size": 10, fill: "var(--fg)" }, svg); t.textContent = "teraz " + plTime(now);
+    }
+  }
+
+  // podpowiedź
+  const tip = document.createElement("div"); tip.className = "tip"; tip.hidden = true; box.appendChild(tip);
+  const cross = el("line", { y1: m.t, y2: m.t + ph + stripH + 8, stroke: "var(--muted)", "stroke-width": 1, visibility: "hidden" }, svg);
+  const move = ev => {
+    const r = svg.getBoundingClientRect(), sx = (ev.clientX - r.left) * W / r.width;
+    const i = Math.floor((sx - m.l) / bw);
+    if (i < 0 || i >= N) { tip.hidden = true; cross.setAttribute("visibility", "hidden"); return; }
+    const o = O[i], cx = X(i) + bw / 2;
+    cross.setAttribute("x1", cx); cross.setAttribute("x2", cx); cross.setAttribute("visibility", "visible");
+    const unre = o.minuta === 0 && o.kier_f === "short";
+    tip.innerHTML = `<b>${o.okres}</b> <span class="pill ${o.lv ? "p" + o.lv : ""}" style="${o.lv ? "" : "background:var(--short);color:var(--fg)"}">${NAZWA[o.lv]}</span>
+      <table class="num">
+      <tr><td>SDAC</td><td>${z2(o.sdac)}</td></tr>
+      <tr><td>CEN prognoza</td><td>${z2(o.cen_f)} ${o.kier_f || ""}</td></tr>
+      ${o.pub ? `<tr><td>opublikowana</td><td>${plTime(o.pub)}</td></tr>` : ""}
+      <tr><td>CEN rozliczeniowa</td><td>${z2(o.cen)} ${o.kier || ""}</td></tr></table>
+      ${unre ? '<div class="muted" style="margin-top:4px">Prognoza xx:00 „short” – w epizodach bywa fałszywa.</div>' : ""}`;
+    tip.hidden = false;
+    const bx = box.getBoundingClientRect();
+    let left = ev.clientX - bx.left + 14; if (left + tip.offsetWidth > bx.width - 4) left = ev.clientX - bx.left - tip.offsetWidth - 14;
+    tip.style.left = Math.max(4, left) + "px"; tip.style.top = Math.max(4, ev.clientY - bx.top - tip.offsetHeight - 10) + "px";
+  };
+  svg.addEventListener("pointermove", move);
+  svg.addEventListener("pointerleave", () => { tip.hidden = true; cross.setAttribute("visibility", "hidden"); });
+}
+function niceStep(x) { const p = Math.pow(10, Math.floor(Math.log10(x || 1))); const n = x / p; return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * p; }
+
+/* ---------- epizody ---------- */
+function renderEpisodes(O, d) {
+  $("epiTitle").textContent = "Alerty w dobie " + d.split("-").reverse().join(".");
+  const eps = []; let cur = null;
+  O.forEach(o => {
+    if (o.future) return;
+    if (o.lv >= 2) { if (!cur) { cur = { a: o, b: o, max: o.lv, list: [] }; eps.push(cur); } cur.b = o; cur.max = Math.max(cur.max, o.lv); cur.list.push(o); }
+    else cur = null;
+  });
+  const negAll = O.filter(o => (o.cen ?? o.cen_f) < 0);
+  const t = $("epi");
+  if (!eps.length) {
+    t.innerHTML = `<tr><td class="muted">Brak alertów w tej dobie.` + (negAll.length ? ` Ujemnych kwadransów: ${negAll.length}.` : "") + `</td></tr>`;
+    return;
+  }
+  const rows = eps.map(e => {
+    const vals = e.list.map(o => o.cen ?? o.cen_f).filter(v => v != null);
+    const neg = vals.filter(v => v < 0);
+    const settled = e.list.every(o => o.cen != null);
+    return `<tr><td class="num">${e.a.okres.slice(0, 5)}–${e.b.okres.slice(-5)}</td>
+      <td><span class="pill p${e.max}">${NAZWA[e.max]}</span></td>
+      <td class="r num">${e.list.length}</td>
+      <td class="r num">${neg.length}</td>
+      <td class="r num">${vals.length ? z0(Math.min(...vals)) : "–"}</td>
+      <td class="r num">${z0(neg.reduce((s, v) => s + v * .25, 0))}${settled ? "" : "*"}</td></tr>`;
+  }).join("");
+  const missed = O.filter(o => !o.future && o.lv < 2 && (o.cen ?? o.cen_f) < 0);
+  t.innerHTML = `<thead><tr><th>Od–do</th><th>Maks.</th><th class="r">Kwadr.</th><th class="r">Ujemne</th><th class="r">Min. CEN</th><th class="r">Wynik 1 MW zł</th></tr></thead><tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="6" class="muted small">Poza alertem ujemnych kwadransów: ${missed.length}${missed.length ? ` (wynik 1 MW ${z0(missed.reduce((s, o) => s + (o.cen ?? o.cen_f) * .25, 0))} zł)` : ""}. * – jeszcze bez rozliczenia, liczone z prognozy.</td></tr></tfoot>`;
+}
+
+/* ---------- sterowanie ---------- */
+async function show(d, quiet) {
+  state.day = d; $("day").value = d;
+  const today = plDate(new Date());
+  $("next").disabled = d >= today;
+  if (!quiet) $("chart").innerHTML = '<div class="status">Ładuję dane PSE…</div>';
+  try {
+    const O = await loadDay(d);
+    if (state.day !== d) return;
+    const now = new Date(), isToday = d === today;
+    computeLevels(O, isToday ? now : new Date(8.64e15));
+    state.O = O;
+    renderChart(O, now, isToday);
+    renderEpisodes(O, d);
+    $("upd").textContent = `Dane PSE pobrane ${plTime(now)}` + (isToday ? " · odświeżanie co minutę" : "");
+  } catch (e) {
+    $("chart").innerHTML = `<div class="status">Nie udało się pobrać danych z API PSE (${e.message}). Sprawdź połączenie i odśwież stronę.</div>`;
+  }
+}
+async function refreshNow() {
+  try {
+    const today = plDate(new Date()), now = new Date();
+    const O = await loadDay(today);
+    renderNow(O, now);
+    if (state.day === today) {
+      computeLevels(O, now); state.O = O;
+      renderChart(O, now, true); renderEpisodes(O, today);
+      $("upd").textContent = `Dane PSE pobrane ${plTime(now)} · odświeżanie co minutę`;
+    }
+  } catch (e) { $("nowWhy").textContent = "Brak połączenia z API PSE – spróbuję ponownie za minutę."; }
+}
+function shift(days) { const d = new Date(state.day + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + days); show(d.toISOString().slice(0, 10)); }
+function setScale(s) { state.scale = s; $("scLog").setAttribute("aria-pressed", s === "log"); $("scLin").setAttribute("aria-pressed", s === "lin");
+  try { localStorage.setItem("cen-skala", s); } catch (e) {} if (state.O.length) renderChart(state.O, new Date(), state.day === plDate(new Date())); }
+
+$("prev").onclick = () => shift(-1);
+$("next").onclick = () => shift(1);
+$("today").onclick = () => show(plDate(new Date()));
+$("day").onchange = e => e.target.value && show(e.target.value);
+document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => show(b.dataset.go));
+$("scLog").onclick = () => setScale("log");
+$("scLin").onclick = () => setScale("lin");
+let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => state.O.length && renderChart(state.O, new Date(), state.day === plDate(new Date())), 150); });
+
+(async () => {
+  try { const r = await fetch("regula.json", { cache: "no-store" }); if (r.ok) REG = Object.assign(REG, await r.json()); } catch (e) {}
+  $("r3").textContent = z0(REG.prog_czerwony_zl_mwh); $("r1").textContent = z0(REG.prog_zolty_sdac_zl_mwh);
+  setScale(state.scale);
+  $("day").max = plDate(new Date());
+  state.day = plDate(new Date()); $("day").value = state.day; $("next").disabled = true;
+  await refreshNow();
+  setInterval(refreshNow, 60000);
+})();
+</script>
+</body>
+</html>
