@@ -5,7 +5,7 @@ Wszystkie dane są publiczne i pochodzą z API PSE (`api.raporty.pse.pl`).
 
 - **Strona** (`index.html`, GitHub Pages) – pobiera dane PSE w przeglądarce: prognoza CEN budowana na bieżąco,
   rozliczenie, SDAC, kierunek long/short, poziom ryzyka dla każdego kwadransa, przegląd dowolnej doby od 14.06.2024.
-- **Alert** (`alert.py`, GitHub Actions co 5 min) – mail, gdy poziom rośnie do 🟠/🔴, przypomnienie co 30 min przy 🔴,
+- **Alert mailowy** (`alert.py`) – **przygotowany, na razie nieaktywny** (brak automatu GitHub Actions). Mail, gdy poziom rośnie do 🟠/🔴, przypomnienie co 30 min przy 🔴,
   mail o końcu alertu; wieczorem mapa ryzyka na jutro z ceny SDAC.
 - **Reguła i progi** – `regula.json` (wspólne dla strony i maili).
 

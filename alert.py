@@ -94,13 +94,15 @@ def doba(data: str) -> list[dict]:
 def poziom(O, n, chwila):
     """Poziom ryzyka dla okresu O[n], gdy wiemy tylko to, co PSE opublikowało do `chwila`.
 
-    Histereza: stan liczony z dwóch ostatnich znanych kwadransów spoza xx:00; kwadrans xx:00
+    Histereza: stan liczony z k (regula.json: wlacz_po_kwadransach) ostatnich znanych kwadransów spoza xx:00 –
+    wyłączenie przy pierwszym sygnale, włączenie dopiero po k kolejnych bez ujemnej CEN; kwadrans xx:00
     może stan tylko pogorszyć (long i CEN < 0), bo jego prognoza bywa fałszywie „short” i dodatnia.
     Zwraca (poziom, najniższa znana CEN long albo None, lista znanych okresów)."""
+    k = REG.get("wlacz_po_kwadransach", 2)
     znane = sorted((o for i, o in enumerate(O) if o.get("pub") and o["pub"] <= chwila and i >= n - 8),
-                   key=lambda o: o["pub"])[-6:]
-    zwykle = [h for h in znane if h["minuta"] != 0][-2:]
-    pelne = [h for h in znane[-3:] if h["minuta"] == 0 and h["kier_f"] == "long" and h["cen_f"] < 0]
+                   key=lambda o: o["pub"])[-(k + 4):]
+    zwykle = [h for h in znane if h["minuta"] != 0][-k:]
+    pelne = [h for h in znane[-(k + 1):] if h["minuta"] == 0 and h["kier_f"] == "long" and h["cen_f"] < 0]
     ceny = [h["cen_f"] for h in zwykle + pelne if h["kier_f"] == "long"]
     c = min(ceny) if ceny else None
     sdac = O[n].get("sdac")
@@ -133,8 +135,13 @@ def ocena_teraz(chwila_utc):
 def tresc(oc, powod):
     O, n, p = oc["O"], oc["n"], oc["poziom"]
     z = lambda x: "–" if x is None else f"{x:,.2f}".replace(",", " ")  # noqa: E731
-    wiersze = [f"{ZNAK[p]} {NAZWA[p].upper()} – {powod}", "",
-               f"Doba {oc['data']}, najbliższy kwadrans {O[n]['okres']}.", ""]
+    k = REG.get("wlacz_po_kwadransach", 2)
+    naglowek = (f"⛔ WYŁĄCZ PV od kwadransu {O[n]['okres']}" if p >= REG["mail_od_poziomu"]
+                else f"{ZNAK[p]} {NAZWA[p]}, kwadrans {O[n]['okres']}")
+    wiersze = [naglowek, f"Poziom: {ZNAK[p]} {NAZWA[p]} ({powod}). Doba {oc['data']}.",
+               f"Włączać z powrotem dopiero po mailu „MOŻNA WŁĄCZYĆ” – przyjdzie po {k} kolejnych zwykłych "
+               "kwadransach bez ujemnej CEN. Pojedynczy dodatni kwadrans (zwłaszcza xx:00) nie jest sygnałem do włączenia.",
+               ""]
     if oc["znane"]:
         wiersze.append("Ostatnie opublikowane prognozy PSE (kwadrans | CEN zł/MWh | kierunek):")
         for h in oc["znane"][-4:]:
@@ -151,6 +158,19 @@ def tresc(oc, powod):
                 "nie przewiduje pierwszego ujemnego kwadransu."]
     if os.environ.get("PAGE_URL"):
         wiersze += ["", "Wykres na żywo: " + os.environ["PAGE_URL"]]
+    return "\n".join(wiersze)
+
+
+def tresc_wlacz(oc):
+    O, n, p = oc["O"], oc["n"], oc["poziom"]
+    k = REG.get("wlacz_po_kwadransach", 2)
+    ost = [h for h in oc["znane"] if h["minuta"] != 0][-k:]
+    wiersze = [f"✅ MOŻNA WŁĄCZYĆ PV od kwadransu {O[n]['okres']}.", "",
+               f"{k} ostatnie znane zwykłe kwadranse bez ujemnej CEN przy kierunku long:"]
+    wiersze += [f"  {h['okres']} | {h['cen_f']:.2f} zł/MWh | {h['kier_f']}" for h in ost]
+    wiersze += ["", f"Poziom teraz: {ZNAK[p]} {NAZWA[p]}. Jeśli CEN znów spadnie, przyjdzie nowy mail „WYŁĄCZ PV”."]
+    if os.environ.get("PAGE_URL"):
+        wiersze += ["", "Wykres: " + os.environ["PAGE_URL"]]
     return "\n".join(wiersze)
 
 
@@ -197,13 +217,13 @@ def tryb_biezacy():
             powod = "trwa"
     if powod:
         od = oc["O"][oc["n"]]["okres"][:5]
-        wyslij(f"{ZNAK[p]} CEN: {NAZWA[p]} od {od} ({powod})", tresc(oc, powod))
+        temat = {"początek": f"⛔ WYŁĄCZ PV od {od} – {ZNAK[p]} {NAZWA[p]}",
+                 "pogorszenie": f"⛔ PV nadal wyłączone – pogorszenie do {ZNAK[p]} {NAZWA[p]} ({od})",
+                 "trwa": f"⛔ PV nadal wyłączone – {ZNAK[p]} {NAZWA[p]} trwa ({od})"}[powod]
+        wyslij(temat, tresc(oc, powod))
         stan["ostatni_mail"] = teraz.strftime("%Y-%m-%d %H:%M:%S")
     elif p < prog <= poprz:
-        wyslij(f"⚪ CEN: koniec alertu ({lokalnie(teraz):%H:%M})",
-               f"Dwa ostatnie znane kwadranse bez ujemnej CEN przy kierunku long, SDAC > 0.\n"
-               f"Poziom teraz: {ZNAK[p]} {NAZWA[p]}." +
-               (f"\n\nWykres: {os.environ['PAGE_URL']}" if os.environ.get("PAGE_URL") else ""))
+        wyslij(f"✅ MOŻNA WŁĄCZYĆ PV od {oc['O'][oc['n']]['okres'][:5]}", tresc_wlacz(oc))
         stan["ostatni_mail"] = teraz.strftime("%Y-%m-%d %H:%M:%S")
     stan["poziom"] = p
     nowy = json.dumps(stan, ensure_ascii=False, indent=1)
