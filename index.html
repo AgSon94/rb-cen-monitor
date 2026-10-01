@@ -138,7 +138,7 @@ footer a { color: inherit; }
 
   <section class="panel now" id="now" data-l="0" aria-live="polite">
     <div>
-      <span class="label">Teraz – rekomendacja dla PV</span>
+      <span class="label">Teraz – najbliższy kwadrans</span>
       <div class="level"><span class="chip"><span class="dot"></span><span id="nowLevel">–</span></span></div>
       <span class="small muted" id="nowWhy">–</span>
     </div>
@@ -176,8 +176,6 @@ footer a { color: inherit; }
       <span><i class="sq" style="background:var(--l1)"></i>czujność</span>
       <span><i class="sq" style="background:var(--l2)"></i>wysokie ryzyko</span>
       <span><i class="sq" style="background:var(--l3)"></i>głęboko ujemna</span>
-      <span style="color:var(--l3);font-weight:700">▼ wyłącz PV</span>
-      <span style="color:var(--long);font-weight:700">▲ włącz PV</span>
     </div>
   </section>
 
@@ -193,8 +191,7 @@ footer a { color: inherit; }
         <li><i class="sq" style="background:var(--l3)"></i><div><b>Głęboko ujemna</b> – ostatni znany kwadrans long i CEN &lt; <span class="num" id="r3">−500</span> zł/MWh. Historycznie: następny ujemny w ok. 81%, w co drugim poniżej −500.</div></li>
         <li><i class="sq" style="background:var(--l2)"></i><div><b>Wysokie ryzyko</b> – ostatni znany kwadrans long i CEN &lt; 0, albo SDAC ≤ 0. Następny ujemny w ok. 72%, mediana ok. −160 zł/MWh.</div></li>
         <li><i class="sq" style="background:var(--l1)"></i><div><b>Czujność</b> – SDAC &lt; <span class="num" id="r1">200</span> zł/MWh. Ujemna CEN w ok. 31–53% takich kwadransów (7–18).</div></li>
-        <li><i class="sq" style="background:var(--l3)"></i><div><b>▼ Wyłącz PV</b> – przy pierwszym sygnale: wysokie ryzyko albo głęboko ujemna CEN. Wyłączenie trwa co najmniej <span class="num" id="rk2">2</span> kwadranse.</div></li>
-        <li><i class="sq" style="background:var(--long)"></i><div><b>▲ Włącz PV</b> – dopiero po <span class="num" id="rk">2</span> kolejnych zwykłych kwadransach bez ujemnej CEN przy long. Pojedynczy dodatni kwadrans nie wystarcza, a kwadrans xx:00 nie liczy się wcale: jego prognoza bywa fałszywie „short” i dodatnia, gdy rozliczenie wychodzi najgłębiej ujemne.</div></li>
+        <li><i class="sq" style="background:var(--short)"></i><div><b>Koniec alertu</b> – po <span class="num" id="rk">2</span> kolejnych zwykłych kwadransach bez ujemnej CEN przy long; alert trwa co najmniej tyle samo kwadransów. Kwadrans xx:00 może alarm podnieść, nigdy odwołać: jego prognoza bywa fałszywie „short” i dodatnia, gdy rozliczenie wychodzi najgłębiej ujemne.</div></li>
       </ul>
       <p class="note">Statystyki z historii VI 2024 – IX 2026, godz. 7–18. Prognoza PSE ukazuje się po zakończeniu kwadransa, więc alert sygnalizuje trwający epizod, nie pierwszy ujemny kwadrans.</p>
     </section>
@@ -206,8 +203,8 @@ footer a { color: inherit; }
 <script>
 const API = "https://api.raporty.pse.pl/api/";
 let REG = { prog_czerwony_zl_mwh: -500, prog_zolty_sdac_zl_mwh: 200, mail_od_poziomu: 2, wlacz_po_kwadransach: 2 };
-const OFF = () => REG.mail_od_poziomu;      // od tego poziomu rekomendacja: wyłącz PV
-const K = () => REG.wlacz_po_kwadransach;   // tyle kolejnych zwykłych kwadransów bez ujemnej CEN, by włączyć
+const OFF = () => REG.mail_od_poziomu;      // od tego poziomu trwa alert (wysokie ryzyko)
+const K = () => REG.wlacz_po_kwadransach;   // tyle kolejnych zwykłych kwadransów bez ujemnej CEN kończy alert
 const NAZWA = ["brak sygnału", "czujność", "wysokie ryzyko", "głęboko ujemna"];
 const $ = id => document.getElementById(id);
 const nf0 = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 0 });
@@ -280,8 +277,8 @@ function poziom(O, n, chwila) {
 
 function computeLevels(O, now) {
   O.forEach((o, n) => { const ch = o.start < now ? o.start : now; Object.assign(o, { lv: poziom(O, n, ch).p, future: o.start > now }); });
-  // wyłączone PV zostaje wyłączone co najmniej K kwadransów – bez tego wyłączenie z powodu SDAC ≤ 0
-  // potrafiło się odwołać po jednym kwadransie (15.08.2026: „włącz 10:00”, a 10:00 rozliczone na −1 509 zł)
+  // alert trwa co najmniej K kwadransów – bez tego alert z powodu SDAC ≤ 0 potrafił się skończyć
+  // po jednym kwadransie (15.08.2026: koniec o 10:00, a 10:00 rozliczone na −1 509 zł)
   let od = -1;
   O.forEach((o, i) => {
     const prev = i > 0 && O[i - 1].off;
@@ -298,22 +295,20 @@ function renderNow(O, now) {
   computeLevels(O, now);
   const { p, c, znane } = poziom(O, n, now);
   box.dataset.l = p;
-  const off = O[n].off;
-  if (off) {
+  if (O[n].off) {
     let j = n - 1; while (j >= 0 && O[j].off) j--;
-    const od = O[j + 1].okres.slice(0, 5);
-    // ile kolejnych zwykłych kwadransów bez ujemnej CEN jest już znanych (licząc od końca)
-    let seria = 0;
+    let seria = 0;  // ile kolejnych zwykłych kwadransów bez ujemnej CEN jest już znanych
     for (const h of znane.filter(h => h.minuta !== 0).reverse()) { if (h.kier_f === "long" && h.cen_f < 0) break; seria++; }
     const brak = Math.max(1, K() - seria);
-    $("nowLevel").textContent = "Wyłącz PV";
-    $("nowWhy").textContent = `wyłączone od ${od} · ${NAZWA[p]}` + (c !== null ? ` · najniższa znana CEN przy long: ${z0(c)} zł/MWh` : "") +
-      ` · do włączenia brakuje ${brak} ${brak === 1 ? "kwadransu" : "kwadransów"} bez ujemnej CEN`;
+    const pp = Math.max(p, OFF());
+    box.dataset.l = pp;
+    $("nowLevel").textContent = NAZWA[pp] + (p < OFF() ? " (podtrzymane)" : "");
+    $("nowWhy").textContent = `alert od ${O[j + 1].okres.slice(0, 5)} · kwadrans ${O[n].okres}` +
+      (c !== null ? ` · najniższa znana CEN przy long: ${z0(c)} zł/MWh` : "") +
+      ` · do końca alertu brakuje ${brak} ${brak === 1 ? "kwadransu" : "kwadransów"} bez ujemnej CEN`;
   } else {
-    let j = n - 1; while (j >= 0 && !O[j].off) j--;
-    $("nowLevel").textContent = "PV może pracować";
-    $("nowWhy").textContent = (j >= 0 ? `włączone ponownie od ${O[j + 1].okres.slice(0, 5)} · ` : "") +
-      (p === 1 ? `czujność: SDAC < ${z0(REG.prog_zolty_sdac_zl_mwh)} zł/MWh` : "brak sygnału ujemnej CEN") + ` · kwadrans ${O[n].okres}`;
+    $("nowLevel").textContent = NAZWA[p];
+    $("nowWhy").textContent = `kwadrans ${O[n].okres}` + (c !== null ? ` · najniższa znana CEN przy long: ${z0(c)} zł/MWh` : "");
   }
   const last = znane[znane.length - 1];
   if (last) {
@@ -335,7 +330,7 @@ function renderChart(O, now, isToday) {
   if (!O.length) { box.innerHTML = '<div class="status">Brak danych PSE dla tej doby.</div>'; return; }
   const W = Math.max(320, box.clientWidth - 20), narrow = W < 600;
   const H = narrow ? 300 : 400, stripH = 14, levH = 8;
-  const m = { l: narrow ? 50 : 64, r: 12, t: levH + 24, b: 40 + stripH };
+  const m = { l: narrow ? 50 : 64, r: 12, t: levH + 8, b: 40 + stripH };
   const pw = W - m.l - m.r, ph = H - m.t - m.b;
   const N = O.length, bw = pw / N;
   const vals = [0];
@@ -406,19 +401,6 @@ function renderChart(O, now, isToday) {
     const unreliable = o.minuta === 0 && o.kier_f === "short";
     el("circle", { cx: X(i) + bw / 2, cy: Y(o.cen_f), r: narrow ? 2 : 2.6, fill: unreliable ? "var(--panel)" : "var(--accent)", stroke: "var(--accent)", "stroke-width": unreliable ? 1.4 : 0 }, svg);
   });
-  // znaczniki: wyłącz przy wejściu w alert, włącz przy wyjściu
-  let lastLab = -1e9;
-  O.forEach((o, i) => {
-    if (i === 0 || o.future) return;
-    const was = O[i - 1].off, is = o.off;
-    if (was === is) return;
-    const x = X(i), col = is ? "var(--l3)" : "var(--long)";
-    el("line", { x1: x, x2: x, y1: levH, y2: m.t + ph, stroke: col, "stroke-width": 1.5 }, svg);
-    if (x - lastLab < (narrow ? 70 : 92)) return;
-    lastLab = x;
-    const t = el("text", { x: x + 3, y: levH + 15, "font-size": narrow ? 10 : 11, "font-weight": 700, fill: col }, svg);
-    t.textContent = (is ? "▼ wyłącz " : "▲ włącz ") + o.okres.slice(0, 5);
-  });
   // ostatni opublikowany punkt dziś – wyróżniony
   if (isToday) {
     const lastI = O.map(o => o.cen_f != null).lastIndexOf(true);
@@ -426,7 +408,7 @@ function renderChart(O, now, isToday) {
     const nx = m.l + ((now - O[0].start) / 9e5) * bw;
     if (nx > m.l && nx < W - m.r) {
       el("line", { x1: nx, x2: nx, y1: m.t - 4, y2: m.t + ph, stroke: "var(--fg)", "stroke-width": 1, "stroke-dasharray": "2 3" }, svg);
-      const t = el("text", { x: nx + 4, y: m.t + ph - 6, "font-size": 10, fill: "var(--fg)" }, svg); t.textContent = "teraz " + plTime(now);
+      const t = el("text", { x: nx + 4, y: m.t + 10, "font-size": 10, fill: "var(--fg)" }, svg); t.textContent = "teraz " + plTime(now);
     }
   }
 
@@ -485,8 +467,8 @@ function renderEpisodes(O, d) {
     const wynik = wynikPV(e.list);
     const settled = e.list.every(o => o.cen != null);
     const nast = O[O.indexOf(e.b) + 1];
-    const wlacz = nast && !nast.future ? nast.okres.slice(0, 5) : "trwa";
-    return `<tr><td class="num" data-l="Wyłącz PV">${e.a.okres.slice(0, 5)}</td><td class="num" data-l="Włącz PV">${wlacz}</td>
+    const koniec = nast && !nast.future ? nast.okres.slice(0, 5) : "trwa";
+    return `<tr><td class="num" data-l="Początek alertu">${e.a.okres.slice(0, 5)}</td><td class="num" data-l="Koniec alertu">${koniec}</td>
       <td data-l="Najwyższy poziom"><span class="pill p${e.max}">${e.max === 3 ? "głęboko ujemna" : e.max === 2 ? "wysokie ryzyko" : "podtrzymanie"}</span></td>
       <td class="r num" data-l="Czas trwania">${czas(e.list.length)}</td>
       <td class="r num" data-l="Ujemne kwadranse">${neg.length}</td>
@@ -494,7 +476,7 @@ function renderEpisodes(O, d) {
       <td class="r num" data-l="Wynik PV 1 MW w zł">${wynik == null ? "–" : z0(wynik)}${settled ? "" : "*"}</td></tr>`;
   }).join("");
   const missed = O.filter(o => !o.future && !o.off && (o.cen ?? o.cen_f) < 0);
-  t.innerHTML = `<thead><tr><th>Wyłącz PV</th><th>Włącz PV</th><th>Najwyższy poziom</th><th class="r">Czas trwania</th><th class="r">Ujemne kwadranse</th><th class="r">Min. CEN zł/MWh</th><th class="r">Wynik PV 1 MW w zł</th></tr></thead><tbody>${rows}</tbody>
+  t.innerHTML = `<thead><tr><th>Początek alertu</th><th>Koniec alertu</th><th>Najwyższy poziom</th><th class="r">Czas trwania</th><th class="r">Ujemne kwadranse</th><th class="r">Min. CEN zł/MWh</th><th class="r">Wynik PV 1 MW w zł</th></tr></thead><tbody>${rows}</tbody>
     <tfoot><tr><td colspan="7" class="muted small">Poza alertem ujemnych kwadransów: ${missed.length}${missed.length ? ` (wynik PV 1 MW ${wynikPV(missed) == null ? "–" : z0(wynikPV(missed))} zł)` : ""}. * – jeszcze bez rozliczenia, liczone z prognozy.</td></tr></tfoot>`;
 }
 
@@ -544,7 +526,7 @@ let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTime
 
 (async () => {
   try { const r = await fetch("regula.json", { cache: "no-store" }); if (r.ok) REG = Object.assign(REG, await r.json()); } catch (e) {}
-  $("r3").textContent = z0(REG.prog_czerwony_zl_mwh); $("r1").textContent = z0(REG.prog_zolty_sdac_zl_mwh); $("rk").textContent = K(); $("rk2").textContent = K();
+  $("r3").textContent = z0(REG.prog_czerwony_zl_mwh); $("r1").textContent = z0(REG.prog_zolty_sdac_zl_mwh); $("rk").textContent = K();
   setScale(state.scale);
   $("day").max = plDate(new Date());
   state.day = plDate(new Date()); $("day").value = state.day; $("next").disabled = true;
