@@ -1,12 +1,12 @@
 # Monitor ujemnej CEN
 
-Strona i alert mailowy o ryzyku ujemnej **ceny niezbilansowania (CEN)** na polskim rynku bilansującym.
+Strona i alarm mailowy o ryzyku ujemnej **ceny niezbilansowania (CEN)** na polskim rynku bilansującym.
 Wszystkie dane są publiczne i pochodzą z API PSE (`api.raporty.pse.pl`).
 
 - **Strona** (`index.html`, GitHub Pages) – pobiera dane PSE w przeglądarce: prognoza CEN budowana na bieżąco,
   rozliczenie, SDAC, kierunek long/short, poziom ryzyka dla każdego kwadransa, przegląd dowolnej doby od 14.06.2024.
-- **Alert mailowy** (`alert.py`) – **przygotowany, na razie nieaktywny** (brak automatu GitHub Actions). Mail, gdy poziom rośnie do 🟠/🔴, przypomnienie co 30 min przy 🔴,
-  mail o końcu alertu; wieczorem mapa ryzyka na jutro z ceny SDAC.
+- **Alarm mailowy** (`alert.py`) – **przygotowany, na razie nieaktywny** (brak automatu GitHub Actions). Mail, gdy poziom rośnie do 🟠/🔴, przypomnienie co 30 min przy 🔴,
+  mail o końcu alarmu; wieczorem mapa ryzyka na jutro z ceny SDAC.
 - **Reguła i progi** – `regula.json` (wspólne dla strony i maili).
 
 ## Reguła
@@ -19,7 +19,7 @@ Wszystkie dane są publiczne i pochodzą z API PSE (`api.raporty.pse.pl`).
 
 „Ostatni znany” = dwa ostatnie opublikowane kwadranse spoza xx:00; kwadrans xx:00 może poziom tylko podnieść,
 bo jego prognoza bywa fałszywie „short” i dodatnia w trakcie epizodów ujemnych cen.
-Prognoza PSE ukazuje się ok. 12 min po końcu kwadransu, więc alert sygnalizuje trwający epizod.
+Prognoza PSE ukazuje się ok. 12 min po końcu kwadransu, więc alarm sygnalizuje trwający epizod.
 
 ## Konfiguracja maili (sekrety repozytorium)
 

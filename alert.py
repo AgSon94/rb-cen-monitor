@@ -1,4 +1,4 @@
-"""Alert mailowy o ryzyku ujemnej ceny niezbilansowania (CEN) na polskim rynku bilansującym.
+"""Alarm mailowy o ryzyku ujemnej ceny niezbilansowania (CEN) na polskim rynku bilansującym.
 
 Źródło: publiczne API PSE (api.raporty.pse.pl). Reguła i progi: regula.json.
 Ta sama reguła działa na stronie (index.html) – zmieniać obie naraz.
@@ -95,7 +95,7 @@ def poziom(O, n, chwila):
     """Poziom ryzyka dla okresu O[n], gdy wiemy tylko to, co PSE opublikowało do `chwila`.
 
     Histereza: stan liczony z k (regula.json: koniec_alertu_po_kwadransach) ostatnich znanych kwadransów spoza xx:00 –
-    alert zaczyna się przy pierwszym sygnale, kończy dopiero po k kolejnych bez ujemnej CEN; kwadrans xx:00
+    alarm zaczyna się przy pierwszym sygnale, kończy dopiero po k kolejnych bez ujemnej CEN; kwadrans xx:00
     może stan tylko pogorszyć (long i CEN < 0), bo jego prognoza bywa fałszywie „short” i dodatnia.
     Zwraca (poziom, najniższa znana CEN long albo None, lista znanych okresów)."""
     k = REG.get("koniec_alertu_po_kwadransach", 2)
@@ -138,8 +138,8 @@ def tresc(oc, powod):
     k = REG.get("koniec_alertu_po_kwadransach", 2)
     wiersze = [f"{ZNAK[p]} {NAZWA[p].upper()} – {powod}", "",
                f"Doba {oc['data']}, najbliższy kwadrans {O[n]['okres']}.",
-               f"Alert skończy się po {k} kolejnych zwykłych kwadransach bez ujemnej CEN – przyjdzie wtedy mail "
-               "„koniec alarmu”. Pojedynczy dodatni kwadrans (zwłaszcza xx:00) nie kończy alertu.", ""]
+               f"Alarm skończy się po {k} kolejnych zwykłych kwadransach bez ujemnej CEN – przyjdzie wtedy mail "
+               "„koniec alarmu”. Pojedynczy dodatni kwadrans (zwłaszcza xx:00) nie kończy alarmu.", ""]
     if oc["znane"]:
         wiersze.append("Ostatnie opublikowane prognozy PSE (kwadrans | CEN zł/MWh | kierunek):")
         for h in oc["znane"][-4:]:
@@ -152,7 +152,7 @@ def tresc(oc, powod):
                 "  🟠 ostatni znany kwadrans long i CEN < 0 → następny ujemny w ok. 72% przypadków, mediana ok. −160 zł/MWh",
                 f"  🔴 ostatni znany kwadrans long i CEN < {REG['prog_czerwony_zl_mwh']} → ujemny w ok. 81%, "
                 "w co drugim poniżej −500, 2% najgorszych poniżej −9 000 zł/MWh",
-                "", "Prognoza PSE ukazuje się ok. 12 min po końcu kwadransu – alert mówi o trwającym epizodzie, "
+                "", "Prognoza PSE ukazuje się ok. 12 min po końcu kwadransu – alarm mówi o trwającym epizodzie, "
                 "nie przewiduje pierwszego ujemnego kwadransu."]
     if os.environ.get("PAGE_URL"):
         wiersze += ["", "Wykres na żywo: " + os.environ["PAGE_URL"]]
@@ -166,7 +166,7 @@ def tresc_koniec(oc):
     wiersze = [f"⚪ KONIEC ALARMU – od kwadransu {O[n]['okres']}.", "",
                f"{k} ostatnie znane zwykłe kwadranse bez ujemnej CEN przy kierunku long:"]
     wiersze += [f"  {h['okres']} | {h['cen_f']:.2f} zł/MWh | {h['kier_f']}" for h in ost]
-    wiersze += ["", f"Poziom teraz: {ZNAK[p]} {NAZWA[p]}. Jeśli CEN znów spadnie, przyjdzie nowy alert."]
+    wiersze += ["", f"Poziom teraz: {ZNAK[p]} {NAZWA[p]}. Jeśli CEN znów spadnie, przyjdzie nowy alarm."]
     if os.environ.get("PAGE_URL"):
         wiersze += ["", "Wykres: " + os.environ["PAGE_URL"]]
     return "\n".join(wiersze)
@@ -207,9 +207,9 @@ def tryb_biezacy():
     p, poprz, prog = oc["poziom"], stan["poziom"], REG["mail_od_poziomu"]
     k = REG.get("koniec_alertu_po_kwadransach", 2)
     start_n = oc["O"][oc["n"]]["start"]
-    # alert trwa co najmniej k kwadransów – bez tego alert z powodu SDAC ≤ 0 potrafił się skończyć po jednym kwadransie
+    # alarm trwa co najmniej k kwadransów – bez tego alarm z powodu SDAC ≤ 0 potrafił się skończyć po jednym kwadransie
     if p < prog <= poprz and stan.get("alert_od") and start_n - _utc(stan["alert_od"]) < dt.timedelta(minutes=15 * k):
-        print(f"alert podtrzymany (trwa krócej niż {k} kwadranse)")
+        print(f"alarm podtrzymany (trwa krócej niż {k} kwadranse)")
         p = poprz
     print(f"{lokalnie(teraz):%Y-%m-%d %H:%M} poziom {p} (poprzednio {poprz}), najniższa znana CEN long: {oc['cena']}")
 
@@ -259,7 +259,7 @@ def tryb_d1():
     wiersze = [f"Jutro ({jutro}) w godz. {g0}–{g1} jest {len(ryz)} kwadransów z SDAC < "
                f"{REG['prog_zolty_sdac_zl_mwh']} zł/MWh, w tym {pom} z SDAC ≤ 0.", "",
                "W takich kwadransach CEN była historycznie ujemna w ok. 31–78% przypadków (im niższa SDAC, tym częściej).",
-               "To sygnał do czujności – właściwy alert przychodzi w ciągu dnia.", "", "Kwadranse (SDAC zł/MWh):"]
+               "To sygnał do czujności – właściwy alarm przychodzi w ciągu dnia.", "", "Kwadranse (SDAC zł/MWh):"]
     wiersze += [f"  {o['okres']}  {o['sdac']:8.2f}  {'🟠' if o['sdac'] <= 0 else '🟡'}" for o in ryz]
     if os.environ.get("PAGE_URL"):
         wiersze += ["", "Wykres: " + os.environ["PAGE_URL"]]

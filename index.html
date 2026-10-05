@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Monitor ujemnych cen na Rynku Bilansującym</title>
-<meta name="description" content="Prognoza i rozliczenie ceny niezbilansowania (CEN) na rynku bilansującym PSE, z alertem ryzyka ujemnych cen.">
+<meta name="description" content="Prognoza i rozliczenie ceny niezbilansowania (CEN) na rynku bilansującym PSE, z alarmem ryzyka ujemnych cen.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -183,17 +183,17 @@ footer a { color: inherit; }
     <section class="panel box">
       <h2 id="epiTitle">Alarmy w dobie</h2>
       <div class="scroll"><table class="t" id="epi"></table></div>
-      <p class="note">Poziom każdego kwadransa liczony z tego, co PSE opublikowało przed jego startem – tak, jak widziałby go alert. „Wynik PV 1 MW” = ile zapłaciłaby farma fotowoltaiczna o mocy 1 MW za energię wyprodukowaną w kwadransach z ujemną CEN. Produkcja w każdym kwadransie według krajowej prognozy PV z planu PSE (BPKD), przeskalowanej tak, by najlepszy kwadrans miesiąca dawał pełne 1 MW. Kwadranse z dodatnią CEN pominięte.</p>
+      <p class="note">Poziom każdego kwadransa liczony z tego, co PSE opublikowało przed jego startem – tak, jak widziałby go alarm. „Wynik PV 1 MW” = ile zapłaciłaby farma fotowoltaiczna o mocy 1 MW za energię wyprodukowaną w kwadransach z ujemną CEN. Produkcja w każdym kwadransie według krajowej prognozy PV z planu PSE (BPKD), przeskalowanej tak, by najlepszy kwadrans miesiąca dawał pełne 1 MW. Kwadranse z dodatnią CEN pominięte.</p>
     </section>
     <section class="panel box">
-      <h2>Reguła alertu</h2>
+      <h2>Reguła alarmu</h2>
       <ul class="rule">
         <li><i class="sq" style="background:var(--l3)"></i><div><b>Alarm</b> – ostatni znany kwadrans long i CEN &lt; <span class="num" id="r3">−500</span> zł/MWh. Historycznie: następny ujemny w ok. 81%, w co drugim poniżej −500.</div></li>
         <li><i class="sq" style="background:var(--l2)"></i><div><b>Ostrzeżenie</b> – ostatni znany kwadrans long i CEN &lt; 0, albo SDAC ≤ 0. Następny ujemny w ok. 72%, mediana ok. −160 zł/MWh.</div></li>
         <li><i class="sq" style="background:var(--l1)"></i><div><b>Czujność</b> – SDAC &lt; <span class="num" id="r1">200</span> zł/MWh. Ujemna CEN w ok. 31–53% takich kwadransów (7–18).</div></li>
         <li><i class="sq" style="background:var(--short)"></i><div><b>Koniec alarmu</b> – po <span class="num" id="rk">2</span> kolejnych zwykłych kwadransach bez ujemnej CEN przy long; alarm trwa co najmniej tyle samo kwadransów. Kwadrans xx:00 może alarm podnieść, nigdy odwołać: jego prognoza bywa fałszywie „short” i dodatnia, gdy rozliczenie wychodzi najgłębiej ujemne.</div></li>
       </ul>
-      <p class="note">Statystyki z historii VI 2024 – IX 2026, godz. 7–18. Prognoza PSE ukazuje się po zakończeniu kwadransa, więc alert sygnalizuje trwający epizod, nie pierwszy ujemny kwadrans.</p>
+      <p class="note">Statystyki z historii VI 2024 – IX 2026, godz. 7–18. Prognoza PSE ukazuje się po zakończeniu kwadransa, więc alarm sygnalizuje trwający epizod, nie pierwszy ujemny kwadrans.</p>
     </section>
   </div>
 
@@ -204,7 +204,7 @@ footer a { color: inherit; }
 const API = "https://api.raporty.pse.pl/api/";
 let REG = { prog_czerwony_zl_mwh: -500, prog_zolty_sdac_zl_mwh: 200, mail_od_poziomu: 2, koniec_alertu_po_kwadransach: 2 };
 const OFF = () => REG.mail_od_poziomu;      // od tego poziomu trwa alarm (ostrzeżenie)
-const K = () => REG.koniec_alertu_po_kwadransach;   // tyle kolejnych zwykłych kwadransów bez ujemnej CEN kończy alert
+const K = () => REG.koniec_alertu_po_kwadransach;   // tyle kolejnych zwykłych kwadransów bez ujemnej CEN kończy alarm
 const NAZWA = ["brak zagrożenia", "czujność", "ostrzeżenie", "alarm"];
 const $ = id => document.getElementById(id);
 const nf0 = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 0 });
@@ -277,7 +277,7 @@ function poziom(O, n, chwila) {
 
 function computeLevels(O, now) {
   O.forEach((o, n) => { const ch = o.start < now ? o.start : now; Object.assign(o, { lv: poziom(O, n, ch).p, future: o.start > now }); });
-  // alert trwa co najmniej K kwadransów – bez tego alert z powodu SDAC ≤ 0 potrafił się skończyć
+  // alarm trwa co najmniej K kwadransów – bez tego alarm z powodu SDAC ≤ 0 potrafił się skończyć
   // po jednym kwadransie (15.08.2026: koniec o 10:00, a 10:00 rozliczone na −1 509 zł)
   let od = -1;
   O.forEach((o, i) => {
@@ -345,7 +345,7 @@ function renderChart(O, now, isToday) {
 
   const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": "Wykres CEN dla doby" }, box);
 
-  // pasma poziomu alertu
+  // pasma poziomu alarmu
   O.forEach((o, i) => {
     if (!o.lv) return;
     el("rect", { x: X(i), y: m.t, width: bw + .5, height: ph, fill: `var(--l${o.lv}-bg)`, opacity: o.future ? .45 : 1 }, svg);
