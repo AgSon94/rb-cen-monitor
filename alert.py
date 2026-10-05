@@ -30,7 +30,7 @@ REG = json.loads((KAT / "regula.json").read_text(encoding="utf-8"))
 STAN = KAT / "stan.json"
 UTC = dt.timezone.utc
 ZNAK = {0: "⚪", 1: "🟡", 2: "🟠", 3: "🔴"}
-NAZWA = {0: "brak sygnału", 1: "czujność", 2: "wysokie ryzyko ujemnej CEN", 3: "głęboko ujemna CEN"}
+NAZWA = {0: "brak zagrożenia", 1: "czujność", 2: "ostrzeżenie – ujemna CEN", 3: "alarm – głęboko ujemna CEN"}
 
 
 # ---------- czas polski bez bazy stref (Windows nie ma tzdata) ----------
@@ -139,7 +139,7 @@ def tresc(oc, powod):
     wiersze = [f"{ZNAK[p]} {NAZWA[p].upper()} – {powod}", "",
                f"Doba {oc['data']}, najbliższy kwadrans {O[n]['okres']}.",
                f"Alert skończy się po {k} kolejnych zwykłych kwadransach bez ujemnej CEN – przyjdzie wtedy mail "
-               "„koniec alertu”. Pojedynczy dodatni kwadrans (zwłaszcza xx:00) nie kończy alertu.", ""]
+               "„koniec alarmu”. Pojedynczy dodatni kwadrans (zwłaszcza xx:00) nie kończy alertu.", ""]
     if oc["znane"]:
         wiersze.append("Ostatnie opublikowane prognozy PSE (kwadrans | CEN zł/MWh | kierunek):")
         for h in oc["znane"][-4:]:
@@ -163,7 +163,7 @@ def tresc_koniec(oc):
     O, n, p = oc["O"], oc["n"], oc["poziom"]
     k = REG.get("koniec_alertu_po_kwadransach", 2)
     ost = [h for h in oc["znane"] if h["minuta"] != 0][-k:]
-    wiersze = [f"⚪ KONIEC ALERTU – od kwadransu {O[n]['okres']}.", "",
+    wiersze = [f"⚪ KONIEC ALARMU – od kwadransu {O[n]['okres']}.", "",
                f"{k} ostatnie znane zwykłe kwadranse bez ujemnej CEN przy kierunku long:"]
     wiersze += [f"  {h['okres']} | {h['cen_f']:.2f} zł/MWh | {h['kier_f']}" for h in ost]
     wiersze += ["", f"Poziom teraz: {ZNAK[p]} {NAZWA[p]}. Jeśli CEN znów spadnie, przyjdzie nowy alert."]
@@ -231,7 +231,7 @@ def tryb_biezacy():
         if powod == "początek":
             stan["alert_od"] = start_n.strftime("%Y-%m-%d %H:%M:%S")
     elif p < prog <= poprz:
-        wyslij(f"⚪ CEN: koniec alertu od {oc['O'][oc['n']]['okres'][:5]}", tresc_koniec(oc))
+        wyslij(f"⚪ CEN: koniec alarmu od {oc['O'][oc['n']]['okres'][:5]}", tresc_koniec(oc))
         stan["ostatni_mail"] = teraz.strftime("%Y-%m-%d %H:%M:%S")
         stan["alert_od"] = None
         stan["maks"] = 0

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Monitor ujemnej CEN</title>
+<title>Monitor ujemnych cen na Rynku Bilansującym</title>
 <meta name="description" content="Prognoza i rozliczenie ceny niezbilansowania (CEN) na rynku bilansującym PSE, z alertem ryzyka ujemnych cen.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,7 +13,7 @@
 :root {
   --bg: #f3f6f8; --panel: #ffffff; --fg: #15212c; --muted: #5d6c7a; --line: #dbe2e8; --grid: #e8edf1;
   --accent: #1b5fd0;        /* prognoza CEN */
-  --settled: #15212c;       /* CEN rozliczeniowa */
+  --settled: #c2187a;       /* CEN rozliczeniowa – magenta, odcina się od niebieskiej prognozy */
   --sdac: #8d99a6;          /* SDAC */
   --long: #0e8a86; --short: #b9c3cc;
   --l1: #d9a300; --l2: #e2700e; --l3: #cf2c2c;
@@ -24,13 +24,13 @@
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #0f151b; --panel: #161e26; --fg: #e4eaf0; --muted: #91a0ae; --line: #2a3541; --grid: #1f2933;
-  --accent: #6aa1ff; --settled: #e4eaf0; --sdac: #6d7a87; --long: #2fc0b8; --short: #3a4652;
+  --accent: #6aa1ff; --settled: #e2519f; --sdac: #6d7a87; --long: #2fc0b8; --short: #3a4652;
   --l1: #f0c03a; --l2: #ff8f3a; --l3: #ff5a5a;
   --l1-bg: rgba(240,192,58,.12); --l2-bg: rgba(255,143,58,.15); --l3-bg: rgba(255,90,90,.17);
   color-scheme: dark; } }
 :root[data-theme="dark"] {
   --bg: #0f151b; --panel: #161e26; --fg: #e4eaf0; --muted: #91a0ae; --line: #2a3541; --grid: #1f2933;
-  --accent: #6aa1ff; --settled: #e4eaf0; --sdac: #6d7a87; --long: #2fc0b8; --short: #3a4652;
+  --accent: #6aa1ff; --settled: #e2519f; --sdac: #6d7a87; --long: #2fc0b8; --short: #3a4652;
   --l1: #f0c03a; --l2: #ff8f3a; --l3: #ff5a5a;
   --l1-bg: rgba(240,192,58,.12); --l2-bg: rgba(255,143,58,.15); --l3-bg: rgba(255,90,90,.17);
   color-scheme: dark; }
@@ -130,7 +130,7 @@ footer a { color: inherit; }
 <main class="wrap">
   <header class="top">
     <div>
-      <h1>Monitor ujemnej CEN</h1>
+      <h1>Monitor ujemnych cen na Rynku Bilansującym</h1>
       <p>Cena niezbilansowania na rynku bilansującym PSE – prognoza budowana na bieżąco, rozliczenie i poziom ryzyka ujemnych cen dla każdego kwadransa.</p>
     </div>
     <div class="small muted" id="upd">Ładuję dane PSE…</div>
@@ -174,24 +174,24 @@ footer a { color: inherit; }
       <span><i class="sq" style="background:var(--long)"></i>long</span>
       <span><i class="sq" style="background:var(--short)"></i>short</span>
       <span><i class="sq" style="background:var(--l1)"></i>czujność</span>
-      <span><i class="sq" style="background:var(--l2)"></i>wysokie ryzyko</span>
-      <span><i class="sq" style="background:var(--l3)"></i>głęboko ujemna</span>
+      <span><i class="sq" style="background:var(--l2)"></i>ostrzeżenie</span>
+      <span><i class="sq" style="background:var(--l3)"></i>alarm</span>
     </div>
   </section>
 
   <div class="cols">
     <section class="panel box">
-      <h2 id="epiTitle">Alerty w dobie</h2>
+      <h2 id="epiTitle">Alarmy w dobie</h2>
       <div class="scroll"><table class="t" id="epi"></table></div>
       <p class="note">Poziom każdego kwadransa liczony z tego, co PSE opublikowało przed jego startem – tak, jak widziałby go alert. „Wynik PV 1 MW” = ile zapłaciłaby farma fotowoltaiczna o mocy 1 MW za energię wyprodukowaną w kwadransach z ujemną CEN. Produkcja w każdym kwadransie według krajowej prognozy PV z planu PSE (BPKD), przeskalowanej tak, by najlepszy kwadrans miesiąca dawał pełne 1 MW. Kwadranse z dodatnią CEN pominięte.</p>
     </section>
     <section class="panel box">
       <h2>Reguła alertu</h2>
       <ul class="rule">
-        <li><i class="sq" style="background:var(--l3)"></i><div><b>Głęboko ujemna</b> – ostatni znany kwadrans long i CEN &lt; <span class="num" id="r3">−500</span> zł/MWh. Historycznie: następny ujemny w ok. 81%, w co drugim poniżej −500.</div></li>
-        <li><i class="sq" style="background:var(--l2)"></i><div><b>Wysokie ryzyko</b> – ostatni znany kwadrans long i CEN &lt; 0, albo SDAC ≤ 0. Następny ujemny w ok. 72%, mediana ok. −160 zł/MWh.</div></li>
+        <li><i class="sq" style="background:var(--l3)"></i><div><b>Alarm</b> – ostatni znany kwadrans long i CEN &lt; <span class="num" id="r3">−500</span> zł/MWh. Historycznie: następny ujemny w ok. 81%, w co drugim poniżej −500.</div></li>
+        <li><i class="sq" style="background:var(--l2)"></i><div><b>Ostrzeżenie</b> – ostatni znany kwadrans long i CEN &lt; 0, albo SDAC ≤ 0. Następny ujemny w ok. 72%, mediana ok. −160 zł/MWh.</div></li>
         <li><i class="sq" style="background:var(--l1)"></i><div><b>Czujność</b> – SDAC &lt; <span class="num" id="r1">200</span> zł/MWh. Ujemna CEN w ok. 31–53% takich kwadransów (7–18).</div></li>
-        <li><i class="sq" style="background:var(--short)"></i><div><b>Koniec alertu</b> – po <span class="num" id="rk">2</span> kolejnych zwykłych kwadransach bez ujemnej CEN przy long; alert trwa co najmniej tyle samo kwadransów. Kwadrans xx:00 może alarm podnieść, nigdy odwołać: jego prognoza bywa fałszywie „short” i dodatnia, gdy rozliczenie wychodzi najgłębiej ujemne.</div></li>
+        <li><i class="sq" style="background:var(--short)"></i><div><b>Koniec alarmu</b> – po <span class="num" id="rk">2</span> kolejnych zwykłych kwadransach bez ujemnej CEN przy long; alarm trwa co najmniej tyle samo kwadransów. Kwadrans xx:00 może alarm podnieść, nigdy odwołać: jego prognoza bywa fałszywie „short” i dodatnia, gdy rozliczenie wychodzi najgłębiej ujemne.</div></li>
       </ul>
       <p class="note">Statystyki z historii VI 2024 – IX 2026, godz. 7–18. Prognoza PSE ukazuje się po zakończeniu kwadransa, więc alert sygnalizuje trwający epizod, nie pierwszy ujemny kwadrans.</p>
     </section>
@@ -203,9 +203,9 @@ footer a { color: inherit; }
 <script>
 const API = "https://api.raporty.pse.pl/api/";
 let REG = { prog_czerwony_zl_mwh: -500, prog_zolty_sdac_zl_mwh: 200, mail_od_poziomu: 2, koniec_alertu_po_kwadransach: 2 };
-const OFF = () => REG.mail_od_poziomu;      // od tego poziomu trwa alert (wysokie ryzyko)
+const OFF = () => REG.mail_od_poziomu;      // od tego poziomu trwa alarm (ostrzeżenie)
 const K = () => REG.koniec_alertu_po_kwadransach;   // tyle kolejnych zwykłych kwadransów bez ujemnej CEN kończy alert
-const NAZWA = ["brak sygnału", "czujność", "wysokie ryzyko", "głęboko ujemna"];
+const NAZWA = ["brak zagrożenia", "czujność", "ostrzeżenie", "alarm"];
 const $ = id => document.getElementById(id);
 const nf0 = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 0 });
 const nf2 = new Intl.NumberFormat("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -303,9 +303,9 @@ function renderNow(O, now) {
     const pp = Math.max(p, OFF());
     box.dataset.l = pp;
     $("nowLevel").textContent = NAZWA[pp] + (p < OFF() ? " (podtrzymane)" : "");
-    $("nowWhy").textContent = `alert od ${O[j + 1].okres.slice(0, 5)} · kwadrans ${O[n].okres}` +
+    $("nowWhy").textContent = `alarm od ${O[j + 1].okres.slice(0, 5)} · kwadrans ${O[n].okres}` +
       (c !== null ? ` · najniższa znana CEN przy long: ${z0(c)} zł/MWh` : "") +
-      ` · do końca alertu brakuje ${brak} ${brak === 1 ? "kwadransu" : "kwadransów"} bez ujemnej CEN`;
+      ` · do końca alarmu brakuje ${brak} ${brak === 1 ? "kwadransu" : "kwadransów"} bez ujemnej CEN`;
   } else {
     $("nowLevel").textContent = NAZWA[p];
     $("nowWhy").textContent = `kwadrans ${O[n].okres}` + (c !== null ? ` · najniższa znana CEN przy long: ${z0(c)} zł/MWh` : "");
@@ -448,7 +448,7 @@ function wynikPV(list) {
 }
 
 function renderEpisodes(O, d) {
-  $("epiTitle").textContent = "Alerty w dobie " + d.split("-").reverse().join(".");
+  $("epiTitle").textContent = "Alarmy w dobie " + d.split("-").reverse().join(".");
   const eps = []; let cur = null;
   O.forEach(o => {
     if (o.future) return;
@@ -458,7 +458,7 @@ function renderEpisodes(O, d) {
   const negAll = O.filter(o => (o.cen ?? o.cen_f) < 0);
   const t = $("epi");
   if (!eps.length) {
-    t.innerHTML = `<tr><td class="muted">Brak alertów w tej dobie.` + (negAll.length ? ` Ujemnych kwadransów: ${negAll.length}.` : "") + `</td></tr>`;
+    t.innerHTML = `<tr><td class="muted">Brak alarmów w tej dobie.` + (negAll.length ? ` Ujemnych kwadransów: ${negAll.length}.` : "") + `</td></tr>`;
     return;
   }
   const rows = eps.map(e => {
@@ -468,16 +468,16 @@ function renderEpisodes(O, d) {
     const settled = e.list.every(o => o.cen != null);
     const nast = O[O.indexOf(e.b) + 1];
     const koniec = nast && !nast.future ? nast.okres.slice(0, 5) : "trwa";
-    return `<tr><td class="num" data-l="Początek alertu">${e.a.okres.slice(0, 5)}</td><td class="num" data-l="Koniec alertu">${koniec}</td>
-      <td data-l="Najwyższy poziom"><span class="pill p${e.max}">${e.max === 3 ? "głęboko ujemna" : e.max === 2 ? "wysokie ryzyko" : "podtrzymanie"}</span></td>
+    return `<tr><td class="num" data-l="Początek alarmu">${e.a.okres.slice(0, 5)}</td><td class="num" data-l="Koniec alarmu">${koniec}</td>
+      <td data-l="Najwyższy poziom"><span class="pill p${e.max}">${e.max === 3 ? "alarm" : e.max === 2 ? "ostrzeżenie" : "podtrzymanie"}</span></td>
       <td class="r num" data-l="Czas trwania">${czas(e.list.length)}</td>
       <td class="r num" data-l="Ujemne kwadranse">${neg.length}</td>
       <td class="r num" data-l="Min. CEN zł/MWh">${vals.length ? z0(Math.min(...vals)) : "–"}</td>
       <td class="r num" data-l="Wynik PV 1 MW w zł">${wynik == null ? "–" : z0(wynik)}${settled ? "" : "*"}</td></tr>`;
   }).join("");
   const missed = O.filter(o => !o.future && !o.off && (o.cen ?? o.cen_f) < 0);
-  t.innerHTML = `<thead><tr><th>Początek alertu</th><th>Koniec alertu</th><th>Najwyższy poziom</th><th class="r">Czas trwania</th><th class="r">Ujemne kwadranse</th><th class="r">Min. CEN zł/MWh</th><th class="r">Wynik PV 1 MW w zł</th></tr></thead><tbody>${rows}</tbody>
-    <tfoot><tr><td colspan="7" class="muted small">Poza alertem ujemnych kwadransów: ${missed.length}${missed.length ? ` (wynik PV 1 MW ${wynikPV(missed) == null ? "–" : z0(wynikPV(missed))} zł)` : ""}. * – jeszcze bez rozliczenia, liczone z prognozy.</td></tr></tfoot>`;
+  t.innerHTML = `<thead><tr><th>Początek alarmu</th><th>Koniec alarmu</th><th>Najwyższy poziom</th><th class="r">Czas trwania</th><th class="r">Ujemne kwadranse</th><th class="r">Min. CEN zł/MWh</th><th class="r">Wynik PV 1 MW w zł</th></tr></thead><tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="7" class="muted small">Poza alarmem ujemnych kwadransów: ${missed.length}${missed.length ? ` (wynik PV 1 MW ${wynikPV(missed) == null ? "–" : z0(wynikPV(missed))} zł)` : ""}. * – jeszcze bez rozliczenia, liczone z prognozy.</td></tr></tfoot>`;
 }
 
 /* ---------- sterowanie ---------- */
