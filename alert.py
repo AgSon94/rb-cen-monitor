@@ -30,7 +30,7 @@ REG = json.loads((KAT / "regula.json").read_text(encoding="utf-8"))
 STAN = KAT / "stan.json"
 UTC = dt.timezone.utc
 ZNAK = {0: "⚪", 1: "🟡", 2: "🟠", 3: "🔴"}
-NAZWA = {0: "brak zagrożenia", 1: "czujność", 2: "ostrzeżenie – ujemna CEN", 3: "alarm – głęboko ujemna CEN"}
+NAZWA = {0: "brak zagrożenia", 1: "czujność", 2: "ostrzeżenie – SDAC ≤ 0", 3: "alarm – ujemna CEN"}
 
 
 # ---------- czas polski bez bazy stref (Windows nie ma tzdata) ----------
@@ -149,9 +149,9 @@ def tresc(oc, powod):
     wiersze.append("SDAC na najbliższą godzinę: " + ", ".join(
         f"{o['okres'][:5]} {z(o['sdac'])}" for o in O[n:n + 4]))
     wiersze += ["", "Co mówi historia (VI 2024–IX 2026, godz. 7–18):",
-                "  🟠 ostatni znany kwadrans long i CEN < 0 → następny ujemny w ok. 72% przypadków, mediana ok. −160 zł/MWh",
-                f"  🔴 ostatni znany kwadrans long i CEN < {REG['prog_czerwony_zl_mwh']} → ujemny w ok. 81%, "
-                "w co drugim poniżej −500, 2% najgorszych poniżej −9 000 zł/MWh",
+                f"  🔴 ostatni znany kwadrans long i CEN < {REG['prog_czerwony_zl_mwh']} → następny ujemny w ok. 74%, "
+                "w co piątym poniżej −500 zł/MWh",
+                "  przy samej CEN < −500 → ujemny w ok. 81%, w co drugim poniżej −500, 2% najgorszych poniżej −9 000 zł/MWh",
                 "", "Prognoza PSE ukazuje się ok. 12 min po końcu kwadransu – alarm mówi o trwającym epizodzie, "
                 "nie przewiduje pierwszego ujemnego kwadransu."]
     if os.environ.get("PAGE_URL"):

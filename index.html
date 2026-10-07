@@ -188,8 +188,8 @@ footer a { color: inherit; }
     <section class="panel box">
       <h2>Reguła alarmu</h2>
       <ul class="rule">
-        <li><i class="sq" style="background:var(--l3)"></i><div><b>Alarm</b> – ostatni znany kwadrans long i CEN &lt; <span class="num" id="r3">−500</span> zł/MWh. Historycznie: następny ujemny w ok. 81%, w co drugim poniżej −500.</div></li>
-        <li><i class="sq" style="background:var(--l2)"></i><div><b>Ostrzeżenie</b> – ostatni znany kwadrans long i CEN &lt; 0, albo SDAC ≤ 0. Następny ujemny w ok. 72%, mediana ok. −160 zł/MWh.</div></li>
+        <li><i class="sq" style="background:var(--l3)"></i><div><b>Alarm</b> – ostatni znany kwadrans long i CEN &lt; <span class="num" id="r3">0</span> zł/MWh. Historycznie: następny ujemny w ok. 74%, w co piątym poniżej −500 zł/MWh.</div></li>
+        <li><i class="sq" style="background:var(--l2)"></i><div><b>Ostrzeżenie</b> – SDAC ≤ 0 zł/MWh: rynek dnia następnego wycenił ten kwadrans na zero lub poniżej, ale prognoza CEN jeszcze nie jest ujemna przy long.</div></li>
         <li><i class="sq" style="background:var(--l1)"></i><div><b>Czujność</b> – SDAC &lt; <span class="num" id="r1">200</span> zł/MWh. Ujemna CEN w ok. 31–53% takich kwadransów (7–18).</div></li>
         <li><i class="sq" style="background:var(--short)"></i><div><b>Koniec alarmu</b> – po <span class="num" id="rk">2</span> kolejnych zwykłych kwadransach bez ujemnej CEN przy long; alarm trwa co najmniej tyle samo kwadransów. Kwadrans xx:00 może alarm podnieść, nigdy odwołać: jego prognoza bywa fałszywie „short” i dodatnia, gdy rozliczenie wychodzi najgłębiej ujemne.</div></li>
       </ul>
@@ -202,7 +202,7 @@ footer a { color: inherit; }
 
 <script>
 const API = "https://api.raporty.pse.pl/api/";
-let REG = { prog_czerwony_zl_mwh: -500, prog_zolty_sdac_zl_mwh: 200, mail_od_poziomu: 2, koniec_alertu_po_kwadransach: 2 };
+let REG = { prog_czerwony_zl_mwh: 0, prog_zolty_sdac_zl_mwh: 200, mail_od_poziomu: 2, koniec_alertu_po_kwadransach: 2 };
 const OFF = () => REG.mail_od_poziomu;      // od tego poziomu trwa alarm (ostrzeżenie)
 const K = () => REG.koniec_alertu_po_kwadransach;   // tyle kolejnych zwykłych kwadransów bez ujemnej CEN kończy alarm
 const NAZWA = ["brak zagrożenia", "czujność", "ostrzeżenie", "alarm"];

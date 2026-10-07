@@ -13,8 +13,8 @@ Wszystkie dane są publiczne i pochodzą z API PSE (`api.raporty.pse.pl`).
 
 | Poziom | Warunek |
 |---|---|
-| 🔴 alarm | ostatni znany kwadrans long i CEN < `prog_czerwony_zl_mwh` (−500) |
-| 🟠 ostrzeżenie | ostatni znany kwadrans long i CEN < 0, albo SDAC ≤ 0 |
+| 🔴 alarm | ostatni znany kwadrans long i CEN < `prog_czerwony_zl_mwh` (0; do 07.10.2026: −500) |
+| 🟠 ostrzeżenie | SDAC ≤ 0 (przy progu alarmu 0 ujemna CEN przy long to już alarm) |
 | 🟡 czujność | SDAC < `prog_zolty_sdac_zl_mwh` (200) |
 
 „Ostatni znany” = dwa ostatnie opublikowane kwadranse spoza xx:00; kwadrans xx:00 może poziom tylko podnieść,
