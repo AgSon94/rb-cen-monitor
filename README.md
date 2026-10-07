@@ -5,7 +5,7 @@ Wszystkie dane są publiczne i pochodzą z API PSE (`api.raporty.pse.pl`).
 
 - **Strona** (`index.html`, GitHub Pages) – pobiera dane PSE w przeglądarce: prognoza CEN budowana na bieżąco,
   rozliczenie, SDAC, kierunek long/short, poziom ryzyka dla każdego kwadransa, przegląd dowolnej doby od 14.06.2024.
-- **Alarm mailowy** (`alert.py`) – **przygotowany, na razie nieaktywny** (brak automatu GitHub Actions). Mail, gdy poziom rośnie do 🟠/🔴, przypomnienie co 30 min przy 🔴,
+- **Alarm mailowy** (`alert.py`) – **przygotowany, na razie nieaktywny** (brak automatu GitHub Actions). Mail tylko przy alarmie 🔴 (🟠 i 🟡 to ostrzeżenia na stronie), przypomnienie co 30 min przy 🔴,
   mail o końcu alarmu; wieczorem mapa ryzyka na jutro z ceny SDAC.
 - **Reguła i progi** – `regula.json` (wspólne dla strony i maili).
 
@@ -14,7 +14,7 @@ Wszystkie dane są publiczne i pochodzą z API PSE (`api.raporty.pse.pl`).
 | Poziom | Warunek |
 |---|---|
 | 🔴 alarm | ostatni znany kwadrans long i CEN < `prog_czerwony_zl_mwh` (0; do 07.10.2026: −500) |
-| 🟠 ostrzeżenie | SDAC ≤ 0 (przy progu alarmu 0 ujemna CEN przy long to już alarm) |
+| 🟠 ostrzeżenie | SDAC ≤ 0 – tylko informacja, nie uruchamia alarmu |
 | 🟡 czujność | SDAC < `prog_zolty_sdac_zl_mwh` (200) |
 
 „Ostatni znany” = dwa ostatnie opublikowane kwadranse spoza xx:00; kwadrans xx:00 może poziom tylko podnieść,

@@ -2,7 +2,7 @@
   "opis": "Progi reguły alarmu ujemnej CEN – wspólne dla strony i maili. Alarm trwa od poziomu mail_od_poziomu, co najmniej koniec_alertu_po_kwadransach kwadransów, i kończy się po tylu kolejnych zwykłych (nie xx:00) kwadransach bez ujemnej CEN przy long.",
   "prog_czerwony_zl_mwh": 0,
   "prog_zolty_sdac_zl_mwh": 200,
-  "mail_od_poziomu": 2,
+  "mail_od_poziomu": 3,
   "przypomnienie_czerwony_min": 30,
   "godziny_pv": [
     7,
